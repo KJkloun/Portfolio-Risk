@@ -3,6 +3,10 @@ import axios from 'axios';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
+// Импорт унифицированных компонентов и дизайн-системы
+import { Card, Button, Input, Badge } from './ui';
+import { themeClasses } from '../styles/designSystem';
+
 function StockPrices() {
   const [stocks, setStocks] = useState([]);
   const [stockPrices, setStockPrices] = useState({});
@@ -188,17 +192,37 @@ function StockPrices() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-gray-400 border-r-2 border-b-2 border-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-600 border-r-2 border-b-2 border-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-6 max-w-6xl mx-auto">
+    <div className={`min-h-screen ${themeClasses.background.secondary} ${themeClasses.transition}`}>
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className={`text-2xl font-medium ${themeClasses.text.primary} mb-2`}>
+            Курсы акций
+          </h1>
+          <p className={`${themeClasses.text.secondary}`}>
+            Управление текущими курсами акций для расчета потенциальной прибыли
+          </p>
+        </div>
+
+        {/* Сообщения */}
+        {error && (
+          <Card variant="default" className="mb-6 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30">
+            <p className="text-red-700 dark:text-red-300 text-sm">{error}</p>
+          </Card>
+        )}
+
+        {successMessage && (
+          <Card variant="default" className="mb-6 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30">
+            <p className="text-green-700 dark:text-green-300 text-sm">{successMessage}</p>
+          </Card>
+        )}
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-          <h1 className="text-2xl font-medium text-gray-900">Курсы акций</h1>
-          
           <div className="flex gap-3 items-center">
             <button 
               onClick={resetStockPrices}
@@ -229,95 +253,93 @@ function StockPrices() {
           </div>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-            {error}
-          </div>
-        )}
+        {filteredStocks.length === 0 ? (
+          <Card className="text-center py-8">
+            <div className={`${themeClasses.text.tertiary} mb-4`}>
+              <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h3 className={`text-lg font-medium ${themeClasses.text.primary} mb-2`}>
+              Нет активных позиций
+            </h3>
+            <p className={`${themeClasses.text.secondary}`}>
+              Создайте сделки, чтобы управлять курсами акций
+            </p>
+          </Card>
+        ) : (
+          <>
+            {/* Информационная панель */}
+            <Card className="mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className={`text-lg font-medium ${themeClasses.text.primary} mb-1`}>
+                    Активные позиции
+                  </h2>
+                  <p className={`text-sm ${themeClasses.text.secondary}`}>
+                    Найдено {filteredStocks.length} уникальных акций в открытых позициях
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="primary"
+                    onClick={initializeDefaultPrices}
+                    size="sm"
+                  >
+                    Инициализировать все курсы
+                  </Button>
+                </div>
+              </div>
+            </Card>
 
-        {successMessage && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">
-            {successMessage}
-          </div>
-        )}
-
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Акция
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Открытые<br/>позиции
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Всего<br/>сделок
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Последняя<br/>цена
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Последняя<br/>сделка
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Текущий<br/>курс
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Действия
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredStocks.map((stock) => (
-                  <tr key={stock.symbol} className={stock.openPositions > 0 ? 'bg-blue-50' : ''}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{stock.symbol}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`text-sm ${stock.openPositions > 0 ? 'font-medium text-blue-700' : 'text-gray-500'}`}>
-                        {stock.openPositions}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">{stock.totalPositions}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {Number(stock.lastPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {stock.lastTradeDate 
-                          ? format(new Date(stock.lastTradeDate), 'd MMM yyyy', { locale: ru })
-                          : '—'
-                        }
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="relative rounded-md w-32">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <span className="text-gray-500 text-sm">₽</span>
+            {/* Список акций */}
+            <div className="space-y-4">
+              {filteredStocks.map((stock) => (
+                <Card key={stock.symbol}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className={`text-lg font-medium ${themeClasses.text.primary}`}>
+                            {stock.symbol}
+                          </h3>
+                          {stockPrices[stock.symbol] && (
+                            <Badge variant="success" size="sm">
+                              {parseFloat(stockPrices[stock.symbol]).toLocaleString('ru-RU', {
+                                style: 'currency',
+                                currency: 'RUB',
+                                maximumFractionDigits: 2
+                              })}
+                            </Badge>
+                          )}
                         </div>
-                        <input
+                        <p className={`text-sm ${themeClasses.text.secondary}`}>
+                          Открытых позиций: {stock.openPositions}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Input
                           type="number"
-                          min="0"
                           step="0.01"
+                          placeholder="Новая цена"
                           value={stockPrices[stock.symbol] || ''}
                           onChange={(e) => updateStockPrice(stock.symbol, e.target.value)}
-                          className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                          placeholder="0.00"
+                          size="sm"
+                          className="w-32"
                         />
+                        <span className={`text-sm ${themeClasses.text.tertiary}`}>₽</span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      {stock.openPositions > 0 && (
-                        <button
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="primary"
+                          size="sm"
                           onClick={() => saveAsLastPrice(stock)}
                           disabled={savingStock === stock.symbol || !stockPrices[stock.symbol]}
-                          className="px-3 py-2 text-sm text-white bg-gray-700 border border-gray-700 rounded-md hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed focus:outline-none focus:ring-1 focus:ring-gray-400"
+                          loading={savingStock === stock.symbol}
                         >
                           {savingStock === stock.symbol ? (
                             <span className="flex items-center">
@@ -327,22 +349,48 @@ function StockPrices() {
                           ) : (
                             'Сохранить'
                           )}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {filteredStocks.length === 0 && (
-                  <tr>
-                    <td colSpan="7" className="px-6 py-8 text-center text-sm text-gray-500">
-                      {searchQuery ? 'Акции с таким названием не найдены' : 'Нет доступных акций'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                        </Button>
+
+                        {stock.openPositions > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => resetStockPrices()}
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Информация о хранении */}
+            <Card variant="secondary" className="mt-8">
+              <div className="flex items-start gap-3">
+                <div className={`${themeClasses.text.info} mt-1`}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className={`font-medium ${themeClasses.text.primary} mb-1`}>
+                    О хранении данных
+                  </h3>
+                  <p className={`text-sm ${themeClasses.text.secondary}`}>
+                    Курсы акций сохраняются локально в браузере и используются для расчета 
+                    потенциальной прибыли по открытым позициям. Данные автоматически загружаются 
+                    при каждом посещении страницы статистики.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </>
+        )}
       </div>
     </div>
   );

@@ -9,13 +9,11 @@ import {
   calculateProfitPercentage 
 } from '../utils/calculations';
 
-// Импорт унифицированных компонентов
+// Импорт унифицированных компонентов и дизайн-системы
 import { Button, Card, Input, Select, Badge } from './ui';
-import { useDesignSystem } from '../hooks/useDesignSystem';
+import { themeClasses } from '../styles/designSystem';
 
 function TradeList() {
-  const { classes, cn, when } = useDesignSystem();
-  
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -410,14 +408,14 @@ function TradeList() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 bg-[#f9f9fa] text-gray-900 min-h-screen">
+    <div className={`max-w-6xl mx-auto px-4 sm:px-6 py-6 ${themeClasses.background.secondary} ${themeClasses.text.primary} ${themeClasses.transition} min-h-screen`}>
       {/* Header and Controls */}
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Список сделок</h1>
+        <h1 className={`text-2xl font-bold ${themeClasses.text.primary}`}>Список сделок</h1>
         <div className="flex space-x-2">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <svg className={`h-5 w-5 ${themeClasses.text.tertiary}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
               </svg>
             </div>
@@ -426,48 +424,52 @@ function TradeList() {
               placeholder="Поиск сделок..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-64 pl-10 pr-3 py-1.5 border border-gray-300 rounded-md text-gray-900 placeholder-gray-400 focus:ring-purple-500 focus:border-purple-500"
+              className={`w-64 pl-10 pr-3 py-1.5 ${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.border.primary} border rounded-md placeholder-gray-400 dark:placeholder-gray-500 ${themeClasses.interactive.focus} ${themeClasses.transition}`}
             />
           </div>
-          <button onClick={() => setIsFilterPanelExpanded(!isFilterPanelExpanded)} className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-purple-500">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsFilterPanelExpanded(!isFilterPanelExpanded)}
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
             </svg>
             {isFilterPanelExpanded ? 'Скрыть фильтры' : 'Показать фильтры'}
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Расширенная панель фильтров */}
       {isFilterPanelExpanded && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-4 transition-all duration-300 ease-in-out">
+        <Card className="mb-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Первая строка фильтров */}
             {/* Статус сделки */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Статус сделки</label>
-              <div className="flex rounded-md overflow-hidden border border-gray-300">
+              <label className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Статус сделки</label>
+              <div className={`flex rounded-md overflow-hidden ${themeClasses.border.primary} border`}>
                 <button
                   onClick={() => setView('all')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'all' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 ${themeClasses.transition} ${view === 'all' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : `${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.interactive.hover}`}`}
                 >
                   Все
                 </button>
                 <button
                   onClick={() => setView('open')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'open' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 ${themeClasses.transition} ${view === 'open' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : `${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.interactive.hover}`}`}
                 >
                   Открытые
                 </button>
                 <button
                   onClick={() => setView('closed')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'closed' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 ${themeClasses.transition} ${view === 'closed' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : `${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.interactive.hover}`}`}
                 >
                   Закрытые
                 </button>
@@ -476,67 +478,67 @@ function TradeList() {
             
             {/* Фильтр по символу */}
             <div>
-              <label htmlFor="symbolFilter" className="block text-sm font-medium text-gray-700 mb-1">Символ акции</label>
-              <input
+              <label htmlFor="symbolFilter" className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Символ акции</label>
+              <Input
                 type="text"
                 id="symbolFilter"
                 value={symbolFilter}
                 onChange={(e) => setSymbolFilter(e.target.value)}
                 placeholder="Введите символ"
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                size="sm"
               />
             </div>
             
             {/* Фильтр по прибыльности */}
             <div>
-              <label htmlFor="profitabilityFilter" className="block text-sm font-medium text-gray-700 mb-1">Прибыльность</label>
-              <select
+              <label htmlFor="profitabilityFilter" className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Прибыльность</label>
+              <Select
                 id="profitabilityFilter"
                 value={profitabilityFilter}
                 onChange={(e) => setProfitabilityFilter(e.target.value)}
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                size="sm"
               >
                 <option value="all">Все сделки</option>
                 <option value="profitable">Прибыльные</option>
                 <option value="unprofitable">Убыточные</option>
-              </select>
+              </Select>
             </div>
             
             {/* Вторая строка фильтров */}
             {/* Фильтр по диапазону дат */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Период сделок</label>
+              <label className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Период сделок</label>
               <div className="flex space-x-2">
-                <input
+                <Input
                   type="date"
                   value={dateRangeFilter.start}
                   onChange={(e) => setDateRangeFilter(prev => ({ ...prev, start: e.target.value }))}
-                  className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  size="sm"
                 />
-                <span className="text-gray-500 inline-flex items-center">—</span>
-                <input
+                <span className={`${themeClasses.text.tertiary} inline-flex items-center`}>—</span>
+                <Input
                   type="date"
                   value={dateRangeFilter.end}
                   onChange={(e) => setDateRangeFilter(prev => ({ ...prev, end: e.target.value }))}
-                  className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  size="sm"
                 />
               </div>
             </div>
             
             {/* Фильтр по размеру позиции */}
             <div>
-              <label htmlFor="positionSizeFilter" className="block text-sm font-medium text-gray-700 mb-1">Размер позиции</label>
-              <select
+              <label htmlFor="positionSizeFilter" className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Размер позиции</label>
+              <Select
                 id="positionSizeFilter"
                 value={positionSizeFilter}
                 onChange={(e) => setPositionSizeFilter(e.target.value)}
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                size="sm"
               >
                 <option value="all">Любой размер</option>
                 <option value="small">Маленькие</option>
                 <option value="medium">Средние</option>
                 <option value="large">Большие</option>
-              </select>
+              </Select>
             </div>
             
             {/* Группировка и сброс фильтров */}
@@ -546,9 +548,9 @@ function TradeList() {
                   type="checkbox" 
                   checked={groupByMonth} 
                   onChange={(e) => handleGroupByMonthChange(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className={`h-4 w-4 text-purple-600 ${themeClasses.border.primary} rounded ${themeClasses.interactive.focus}`}
                 />
-                <span className="ml-2 text-sm text-gray-700">Группировать по месяцам</span>
+                <span className={`ml-2 text-sm ${themeClasses.text.primary}`}>Группировать по месяцам</span>
               </label>
               
               <label className="flex items-center cursor-pointer">
@@ -556,12 +558,14 @@ function TradeList() {
                   type="checkbox" 
                   checked={groupByEntryPrice} 
                   onChange={(e) => handleGroupByEntryPriceChange(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className={`h-4 w-4 text-purple-600 ${themeClasses.border.primary} rounded ${themeClasses.interactive.focus}`}
                 />
-                <span className="ml-2 text-sm text-gray-700">Группировать по цене входа</span>
+                <span className={`ml-2 text-sm ${themeClasses.text.primary}`}>Группировать по цене входа</span>
               </label>
               
-              <button 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   setSymbolFilter('');
                   setDateRangeFilter({ start: '', end: '' });
@@ -569,123 +573,124 @@ function TradeList() {
                   setPositionSizeFilter('all');
                   setFilter('');
                 }}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 Сбросить фильтры
-              </button>
+              </Button>
             </div>
           </div>
           
           {/* Индикатор активных фильтров */}
           {(filter || symbolFilter || dateRangeFilter.start || dateRangeFilter.end || profitabilityFilter !== 'all' || positionSizeFilter !== 'all') && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-xs text-gray-500">Активные фильтры:</span>
+              <span className={`text-xs ${themeClasses.text.tertiary}`}>Активные фильтры:</span>
               {filter && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   Поиск: {filter}
-                </span>
+                </Badge>
               )}
               {symbolFilter && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   Символ: {symbolFilter}
-                </span>
+                </Badge>
               )}
               {dateRangeFilter.start && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   С: {dateRangeFilter.start}
-                </span>
+                </Badge>
               )}
               {dateRangeFilter.end && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   По: {dateRangeFilter.end}
-                </span>
+                </Badge>
               )}
               {profitabilityFilter !== 'all' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   {profitabilityFilter === 'profitable' ? 'Прибыльные' : 'Убыточные'}
-                </span>
+                </Badge>
               )}
               {positionSizeFilter !== 'all' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   Размер: {positionSizeFilter === 'small' ? 'Маленькие' : positionSizeFilter === 'medium' ? 'Средние' : 'Большие'}
-                </span>
+                </Badge>
               )}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Расширенные элементы управления сортировкой и группировкой */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="text-sm font-medium text-gray-700">Сортировать по:</div>
-        <div className="flex gap-2 flex-wrap">
-          <Button 
-            variant={sortBy === 'entryDate' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('entryDate');
-              if (sortBy === 'entryDate') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Дате входа {sortBy === 'entryDate' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'symbol' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('symbol');
-              if (sortBy === 'symbol') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Тикеру {sortBy === 'symbol' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'entryPrice' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('entryPrice');
-              if (sortBy === 'entryPrice') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Цене входа {sortBy === 'entryPrice' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'totalCost' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('totalCost');
-              if (sortBy === 'totalCost') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Сумме {sortBy === 'totalCost' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'marginAmount' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('marginAmount');
-              if (sortBy === 'marginAmount') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Ставке {sortBy === 'marginAmount' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'profit' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('profit');
-              if (sortBy === 'profit') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Прибыли {sortBy === 'profit' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
+      <Card className="mb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className={`text-sm font-medium ${themeClasses.text.primary}`}>Сортировать по:</div>
+          <div className="flex gap-2 flex-wrap">
+            <Button 
+              variant={sortBy === 'entryDate' ? 'primary' : 'outline'} 
+              size="sm"
+              onClick={() => {
+                setSortBy('entryDate');
+                if (sortBy === 'entryDate') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              }}
+            >
+              Дате входа {sortBy === 'entryDate' && (sortOrder === 'asc' ? '↑' : '↓')}
+            </Button>
+            
+            <Button 
+              variant={sortBy === 'symbol' ? 'primary' : 'outline'} 
+              size="sm"
+              onClick={() => {
+                setSortBy('symbol');
+                if (sortBy === 'symbol') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              }}
+            >
+              Тикеру {sortBy === 'symbol' && (sortOrder === 'asc' ? '↑' : '↓')}
+            </Button>
+            
+            <Button 
+              variant={sortBy === 'entryPrice' ? 'primary' : 'outline'} 
+              size="sm"
+              onClick={() => {
+                setSortBy('entryPrice');
+                if (sortBy === 'entryPrice') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              }}
+            >
+              Цене входа {sortBy === 'entryPrice' && (sortOrder === 'asc' ? '↑' : '↓')}
+            </Button>
+            
+            <Button 
+              variant={sortBy === 'totalCost' ? 'primary' : 'outline'} 
+              size="sm"
+              onClick={() => {
+                setSortBy('totalCost');
+                if (sortBy === 'totalCost') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              }}
+            >
+              Сумме {sortBy === 'totalCost' && (sortOrder === 'asc' ? '↑' : '↓')}
+            </Button>
+            
+            <Button 
+              variant={sortBy === 'marginAmount' ? 'primary' : 'outline'} 
+              size="sm"
+              onClick={() => {
+                setSortBy('marginAmount');
+                if (sortBy === 'marginAmount') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              }}
+            >
+              Ставке {sortBy === 'marginAmount' && (sortOrder === 'asc' ? '↑' : '↓')}
+            </Button>
+            
+            <Button 
+              variant={sortBy === 'profit' ? 'primary' : 'outline'} 
+              size="sm"
+              onClick={() => {
+                setSortBy('profit');
+                if (sortBy === 'profit') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+              }}
+            >
+              Прибыли {sortBy === 'profit' && (sortOrder === 'asc' ? '↑' : '↓')}
+            </Button>
+          </div>
         </div>
-      </div>
+      </Card>
       
       {/* Панель выбора сделок */}
       <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">

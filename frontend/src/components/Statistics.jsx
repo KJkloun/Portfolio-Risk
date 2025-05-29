@@ -19,31 +19,12 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 
 // Импорт унифицированных компонентов и дизайн-системы
-import { Card, Button, Select, Badge } from '../ui';
-import { themeClasses, colors } from '../../styles/designSystem';
+import { Card, Button, Select, Badge } from './ui';
+import { themeClasses, colors } from '../styles/designSystem';
+import { useTheme } from '../contexts/ThemeContext';
 
 // Initialize pdfMake with fonts
 pdfMake.vfs = pdfFonts.vfs;
-
-// Унифицированная цветовая палитра для графиков на основе дизайн-системы
-const CHART_COLORS = {
-  primary: colors.primary[500],
-  secondary: colors.primary[300],
-  accent: colors.accent.purple.main,
-  success: colors.success.main,
-  error: colors.error.main,
-  warning: colors.warning.main,
-};
-
-// Цвета для темной темы в графиках
-const DARK_CHART_COLORS = {
-  primary: colors.primary[400],
-  secondary: colors.primary[600],
-  accent: colors.accent.purple.light,
-  success: colors.success.light,
-  error: colors.error.light,
-  warning: colors.warning.light,
-};
 
 // Register Chart.js components
 ChartJS.register(
@@ -59,6 +40,29 @@ ChartJS.register(
 );
 
 function Statistics() {
+  const { isDark } = useTheme();
+  
+  // Унифицированная цветовая палитра для графиков в зависимости от темы
+  const chartColors = {
+    primary: isDark ? '#8b5cf6' : '#7c3aed',
+    secondary: isDark ? '#6366f1' : '#4f46e5', 
+    success: isDark ? '#10b981' : '#059669',
+    error: isDark ? '#ef4444' : '#dc2626',
+    warning: isDark ? '#f59e0b' : '#d97706',
+    info: isDark ? '#3b82f6' : '#2563eb',
+    
+    // Дополнительные цвета для многоцветных графиков
+    accent1: isDark ? '#a855f7' : '#9333ea',
+    accent2: isDark ? '#06b6d4' : '#0891b2',
+    accent3: isDark ? '#84cc16' : '#65a30d',
+    accent4: isDark ? '#f97316' : '#ea580c',
+    
+    // Цвета текста и сетки для графиков
+    text: isDark ? '#d1d5db' : '#6b7280',
+    grid: isDark ? '#374151' : '#f3f4f6',
+    background: isDark ? '#1f2937' : '#ffffff',
+  };
+
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -86,6 +90,58 @@ function Statistics() {
     },
     monthlyProfits: {},
     upcomingTrades: [],
+  });
+
+  // Общие опции для всех графиков с поддержкой темной темы
+  const getChartOptions = (customOptions = {}) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        labels: {
+          color: chartColors.text,
+          usePointStyle: true,
+          padding: 20,
+        },
+        ...customOptions.plugins?.legend,
+      },
+      tooltip: {
+        backgroundColor: chartColors.background,
+        titleColor: isDark ? '#f9fafb' : '#111827',
+        bodyColor: chartColors.text,
+        borderColor: chartColors.grid,
+        borderWidth: 1,
+        ...customOptions.plugins?.tooltip,
+      },
+    },
+    scales: {
+      x: {
+        grid: {
+          color: chartColors.grid,
+          display: true,
+        },
+        ticks: {
+          color: chartColors.text,
+        },
+        border: {
+          display: false,
+        },
+        ...customOptions.scales?.x,
+      },
+      y: {
+        grid: {
+          color: chartColors.grid,
+        },
+        ticks: {
+          color: chartColors.text,
+        },
+        border: {
+          display: false,
+        },
+        ...customOptions.scales?.y,
+      },
+    },
+    ...customOptions,
   });
 
   // Load trades and saved stock prices when component mounts
@@ -924,8 +980,8 @@ function Statistics() {
       {
         label: 'Прибыль (без %)',
         data: profits,
-        backgroundColor: 'rgba(124, 58, 237, 0.7)',
-        borderColor: 'rgba(124, 58, 237, 1)',
+        backgroundColor: chartColors.primary + '99', // добавляем прозрачность
+        borderColor: chartColors.primary,
         borderWidth: 1,
         borderRadius: 4,
         barPercentage: 0.8,
@@ -934,8 +990,8 @@ function Statistics() {
       {
         label: 'Прибыль (с %)',
         data: profitsAfterInterest,
-        backgroundColor: 'rgba(79, 70, 229, 0.7)',
-        borderColor: 'rgba(79, 70, 229, 1)',
+        backgroundColor: chartColors.secondary + '99', // добавляем прозрачность
+        borderColor: chartColors.secondary,
         borderWidth: 1,
         borderRadius: 4,
         barPercentage: 0.8,
@@ -1132,8 +1188,8 @@ function Statistics() {
         datasets: [{
           label: 'Прибыль по месяцам',
           data: [0],
-          backgroundColor: CHART_COLORS.primary,
-          borderColor: CHART_COLORS.secondary,
+          backgroundColor: chartColors.primary,
+          borderColor: chartColors.secondary,
           borderWidth: 1
         }]
       };
@@ -1148,8 +1204,8 @@ function Statistics() {
       datasets: [{
         label: 'Прибыль',
         data: months.map(m => profitMap[m]),
-        backgroundColor: months.map(m => profitMap[m] >= 0 ? CHART_COLORS.green : CHART_COLORS.red),
-        borderColor: CHART_COLORS.secondary,
+        backgroundColor: months.map(m => profitMap[m] >= 0 ? chartColors.green : chartColors.red),
+        borderColor: chartColors.secondary,
         borderWidth: 1,
         borderRadius: 4
       }]
@@ -1177,7 +1233,7 @@ function Statistics() {
       labels: ['Открытые', 'Закрытые'],
       datasets: [{
         data: [openCount, closedCount],
-        backgroundColor: [CHART_COLORS.primary, CHART_COLORS.secondary],
+        backgroundColor: [chartColors.primary, chartColors.secondary],
         borderColor: '#ffffff',
         borderWidth: 2,
         hoverOffset: 8
@@ -1197,8 +1253,8 @@ function Statistics() {
         datasets: [{
           label: 'Диапазон цен',
           data: [0],
-          backgroundColor: CHART_COLORS.primary,
-          borderColor: CHART_COLORS.secondary,
+          backgroundColor: chartColors.primary,
+          borderColor: chartColors.secondary,
           borderWidth: 1
         }]
       };
@@ -1236,7 +1292,7 @@ function Statistics() {
         label: 'Количество сделок в диапазоне цен',
         data: rangeCounts,
         backgroundColor: rangeColors,
-        borderColor: CHART_COLORS.secondary,
+        borderColor: chartColors.secondary,
         borderWidth: 1,
         borderRadius: 6
       }]
@@ -1259,7 +1315,7 @@ function Statistics() {
         datasets: [{
           label: 'Накопленная прибыль',
           data: [0],
-          borderColor: CHART_COLORS.secondary,
+          borderColor: chartColors.secondary,
           backgroundColor: 'transparent',
           tension: 0.1,
           pointRadius: 0
@@ -1279,7 +1335,7 @@ function Statistics() {
     
     // Определяем цвет линии в зависимости от итоговой прибыли
     const finalProfit = data[data.length - 1];
-    const lineColor = finalProfit >= 0 ? CHART_COLORS.green : CHART_COLORS.red;
+    const lineColor = finalProfit >= 0 ? chartColors.green : chartColors.red;
     const gradientColor = finalProfit >= 0 ? 
       'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
     
@@ -1724,50 +1780,7 @@ function Statistics() {
                   <div style={{ height: '300px', width: '100%' }}>
                     <Bar
                       data={prepareStockMonthlyProfitData(selectedStock)}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: {
-                            backgroundColor: 'white',
-                            titleColor: '#374151',
-                            bodyColor: '#6b7280',
-                            borderColor: '#d1d5db',
-                            borderWidth: 1,
-                            callbacks: {
-                              label: function(context) {
-                                return `Прибыль: ${new Intl.NumberFormat('ru-RU', {
-                                  style: 'currency',
-                                  currency: 'RUB',
-                                  maximumFractionDigits: 0
-                                }).format(context.parsed.y)}`;
-                              }
-                            }
-                          }
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            grid: { color: '#f3f4f6' },
-                            border: { display: false },
-                            ticks: {
-                              callback: function(value) {
-                                return new Intl.NumberFormat('ru-RU', {
-                                  style: 'currency',
-                                  currency: 'RUB',
-                                  notation: 'compact'
-                                }).format(value);
-                              }
-                            }
-                          },
-                          x: {
-                            grid: { display: false },
-                            border: { display: false }
-                          }
-                        },
-                        elements: { bar: { borderRadius: 2 } }
-                      }}
+                      options={getChartOptions()}
                     />
                   </div>
                 </Card>
@@ -1781,17 +1794,7 @@ function Statistics() {
                     <div style={{ height: '250px', width: '100%' }}>
                       <Doughnut
                         data={prepareStockStatusData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          cutout: '70%',
-                          plugins: {
-                            legend: {
-                              position: 'bottom',
-                              labels: { padding: 20, usePointStyle: true }
-                            }
-                          }
-                        }}
+                        options={getChartOptions({ plugins: { legend: { position: 'bottom' } } })}
                       />
                     </div>
                   </Card>
@@ -1804,25 +1807,7 @@ function Statistics() {
                     <div style={{ height: '250px', width: '100%' }}>
                       <Bar
                         data={prepareStockEntryPriceData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: { display: false }
-                          },
-                          scales: {
-                            y: {
-                              beginAtZero: true,
-                              grid: { color: '#f3f4f6' },
-                              border: { display: false }
-                            },
-                            x: {
-                              grid: { display: false },
-                              border: { display: false }
-                            }
-                          },
-                          elements: { bar: { borderRadius: 2 } }
-                        }}
+                        options={getChartOptions({ plugins: { legend: { display: false } } })}
                       />
                     </div>
                   </Card>
@@ -1835,22 +1820,7 @@ function Statistics() {
                     <div style={{ height: '250px', width: '100%' }}>
                       <Line
                         data={prepareStockCumulativeProfitData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: { legend: { display: false } },
-                          scales: {
-                            y: {
-                              grid: { color: '#f3f4f6' },
-                              border: { display: false }
-                            },
-                            x: {
-                              grid: { display: false },
-                              border: { display: false }
-                            }
-                          },
-                          interaction: { intersect: false, mode: 'index' }
-                        }}
+                        options={getChartOptions({ plugins: { legend: { display: false } } })}
                       />
                     </div>
                   </Card>
@@ -1872,28 +1842,7 @@ function Statistics() {
                 <div style={{ height: '300px' }}>
                   <Bar 
                     data={prepareMonthlyProfitData()} 
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          position: 'top',
-                          labels: { usePointStyle: true, padding: 20 }
-                        }
-                      },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          grid: { color: '#f3f4f6' },
-                          border: { display: false }
-                        },
-                        x: {
-                          grid: { display: false },
-                          border: { display: false }
-                        }
-                      },
-                      elements: { bar: { borderRadius: 2 } }
-                    }}
+                    options={getChartOptions({ plugins: { legend: { position: 'top' } } })}
                   />
                 </div>
               ) : (
@@ -1912,22 +1861,7 @@ function Statistics() {
                 <div style={{ height: '300px' }}>
                   <Line
                     data={prepareDailyProfitData()}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          grid: { color: '#f3f4f6' },
-                          border: { display: false }
-                        },
-                        x: {
-                          grid: { display: false },
-                          border: { display: false }
-                        }
-                      }
-                    }}
+                    options={getChartOptions({ plugins: { legend: { display: false } } })}
                   />
                 </div>
               ) : (
@@ -1948,21 +1882,11 @@ function Statistics() {
                     labels: ['Открытые', 'Закрытые'],
                     datasets: [{
                       data: [stats.totalTradesOpen, stats.totalTradesClosed],
-                      backgroundColor: [CHART_COLORS.primary, CHART_COLORS.secondary],
+                      backgroundColor: [chartColors.primary, chartColors.secondary],
                       borderWidth: 0
                     }],
                   }}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '70%',
-                    plugins: {
-                      legend: {
-                        position: 'right',
-                        labels: { usePointStyle: true, padding: 20 }
-                      }
-                    }
-                  }}
+                  options={getChartOptions({ plugins: { legend: { position: 'right' } } })}
                 />
               </div>
             </Card>
