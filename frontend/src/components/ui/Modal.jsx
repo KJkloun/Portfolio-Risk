@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../../contexts/ThemeContext';
-import { Button } from './Button';
+import Button from './Button';
 
 // Варианты анимаций для модальных окон
 const overlayVariants = {
