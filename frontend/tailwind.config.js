@@ -4,6 +4,7 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  darkMode: 'class', // Включаем поддержку темной темы через класс
   theme: {
     extend: {
       colors: {
@@ -75,6 +76,9 @@ export default {
         'card': '0 4px 20px rgba(0, 0, 0, 0.08)',
         'card-hover': '0 10px 30px rgba(0, 0, 0, 0.12)',
         'button': '0 2px 5px rgba(0, 0, 0, 0.1)',
+        // Тени для темной темы
+        'card-dark': '0 4px 20px rgba(0, 0, 0, 0.3)',
+        'card-hover-dark': '0 10px 30px rgba(0, 0, 0, 0.4)',
       },
     },
   },
