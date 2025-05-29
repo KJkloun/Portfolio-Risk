@@ -12,7 +12,7 @@ import {
 // Импорт унифицированных компонентов и дизайн-системы
 import { Button, Card, Input, Select, Badge } from './ui';
 import { themeClasses } from '../styles/designSystem';
-import DraggableTradeRow from './DraggableTradeRow';
+import DraggableTradeList from './DraggableTradeList';
 
 function TradeList() {
   const [trades, setTrades] = useState([]);
@@ -816,7 +816,7 @@ function TradeList() {
         // Сделки без группировки
         isDragMode ? (
           // Режим drag & drop
-          <DraggableTradeRow
+          <DraggableTradeList
             trades={filteredAndSortedTrades}
             onReorder={handleReorderTrades}
             renderTrade={renderTrade}

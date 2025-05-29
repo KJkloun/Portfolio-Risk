@@ -13,7 +13,7 @@ const useKeyboardShortcuts = (shortcuts = {}) => {
 
     // Создаем строку комбинации клавиш
     const combo = [];
-    if (event.ctrlKey || event.metaKey) combo.push('cmd');
+    if (event.ctrlKey || event.metaKey) combo.push('ctrl');
     if (event.altKey) combo.push('alt');
     if (event.shiftKey) combo.push('shift');
     combo.push(event.key.toLowerCase());
@@ -44,27 +44,27 @@ const useKeyboardShortcuts = (shortcuts = {}) => {
 
 // Предустановленные комбинации клавиш
 export const SHORTCUTS = {
-  // Навигация
-  NEW_TRADE: 'alt+n',
-  SAVE: 'alt+s',
-  EDIT: 'alt+e',
-  DELETE: 'alt+d',
-  SEARCH: 'alt+f',
+  // Навигация (используем shift+ для безопасности)
+  NEW_TRADE: 'shift+n',        // Безопасная комбинация
+  SAVE: 'shift+s',             // Безопасная комбинация
+  EDIT: 'shift+e',             // Безопасная комбинация  
+  DELETE: 'shift+d',           // Безопасная комбинация
+  SEARCH: 'shift+f',           // Безопасная комбинация
   
   // Быстрые действия
-  QUICK_ENTRY: 'alt+shift+n',
-  BULK_IMPORT: 'alt+shift+i',
-  EXPORT_PDF: 'alt+shift+p',
+  QUICK_ENTRY: 'shift+q',      // Быстрая сделка
+  BULK_IMPORT: 'shift+i',      // Импорт
+  EXPORT_PDF: 'shift+p',       // Экспорт
   
   // UI
-  TOGGLE_THEME: 'alt+shift+t',
+  TOGGLE_THEME: 'shift+t',     // Переключение темы
   CLOSE_MODAL: 'escape',
   
-  // Вкладки/страницы
-  TRADES_TAB: 'alt+1',
-  STATISTICS_TAB: 'alt+2',
-  PRICES_TAB: 'alt+3',
-  IMPORT_TAB: 'alt+4',
+  // Вкладки/страницы - используем буквы
+  TRADES_TAB: 'shift+1',       // Список сделок
+  STATISTICS_TAB: 'shift+2',   // Статистика
+  PRICES_TAB: 'shift+3',       // Курсы акций
+  IMPORT_TAB: 'shift+4',       // Импорт данных
 };
 
 // Хелпер для отображения комбинаций клавиш в UI
@@ -73,6 +73,7 @@ export const formatShortcut = (shortcut) => {
   
   return shortcut
     .replace('cmd', isMac ? '⌘' : 'Ctrl')
+    .replace('ctrl', 'Ctrl')
     .replace('alt', isMac ? '⌥' : 'Alt')
     .replace('shift', isMac ? '⇧' : 'Shift')
     .replace(/\+/g, ' + ')  // Заменяем все + на пробелы с +
