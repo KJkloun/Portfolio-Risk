@@ -8,9 +8,14 @@ import {
   calculateProfit, 
   calculateProfitPercentage 
 } from '../utils/calculations';
-import Button from './common/Button';
+
+// Импорт унифицированных компонентов
+import { Button, Card, Input, Select, Badge } from './ui';
+import { useDesignSystem } from '../hooks/useDesignSystem';
 
 function TradeList() {
+  const { classes, cn, when } = useDesignSystem();
+  
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
