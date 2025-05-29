@@ -8,7 +8,10 @@ import {
   calculateProfit, 
   calculateProfitPercentage 
 } from '../utils/calculations';
-import Button from './common/Button';
+
+// Импорт унифицированных компонентов и дизайн-системы
+import { Button, Card, Input, Select, Badge } from './ui';
+import { themeClasses } from '../styles/designSystem';
 
 function TradeList() {
   const [trades, setTrades] = useState([]);
@@ -405,14 +408,14 @@ function TradeList() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 bg-[#f9f9fa] text-gray-900 min-h-screen">
+    <div className={`max-w-6xl mx-auto px-4 sm:px-6 py-6 ${themeClasses.background.secondary} ${themeClasses.text.primary} ${themeClasses.transition} min-h-screen`}>
       {/* Header and Controls */}
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Список сделок</h1>
+        <h1 className={`text-2xl font-bold ${themeClasses.text.primary}`}>Список сделок</h1>
         <div className="flex space-x-2">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <svg className={`h-5 w-5 ${themeClasses.text.tertiary}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
               </svg>
             </div>
@@ -421,48 +424,52 @@ function TradeList() {
               placeholder="Поиск сделок..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-64 pl-10 pr-3 py-1.5 border border-gray-300 rounded-md text-gray-900 placeholder-gray-400 focus:ring-purple-500 focus:border-purple-500"
+              className={`w-64 pl-10 pr-3 py-1.5 ${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.border.primary} border rounded-md placeholder-gray-400 dark:placeholder-gray-500 ${themeClasses.interactive.focus} ${themeClasses.transition}`}
             />
           </div>
-          <button onClick={() => setIsFilterPanelExpanded(!isFilterPanelExpanded)} className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-purple-500">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsFilterPanelExpanded(!isFilterPanelExpanded)}
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
             </svg>
             {isFilterPanelExpanded ? 'Скрыть фильтры' : 'Показать фильтры'}
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Расширенная панель фильтров */}
       {isFilterPanelExpanded && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-4 transition-all duration-300 ease-in-out">
+        <Card className="mb-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Первая строка фильтров */}
             {/* Статус сделки */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Статус сделки</label>
-              <div className="flex rounded-md overflow-hidden border border-gray-300">
+              <label className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Статус сделки</label>
+              <div className={`flex rounded-md overflow-hidden ${themeClasses.border.primary} border`}>
                 <button
                   onClick={() => setView('all')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'all' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 ${themeClasses.transition} ${view === 'all' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : `${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.interactive.hover}`}`}
                 >
                   Все
                 </button>
                 <button
                   onClick={() => setView('open')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'open' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 ${themeClasses.transition} ${view === 'open' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : `${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.interactive.hover}`}`}
                 >
                   Открытые
                 </button>
                 <button
                   onClick={() => setView('closed')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'closed' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 ${themeClasses.transition} ${view === 'closed' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : `${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.interactive.hover}`}`}
                 >
                   Закрытые
                 </button>
@@ -471,67 +478,67 @@ function TradeList() {
             
             {/* Фильтр по символу */}
             <div>
-              <label htmlFor="symbolFilter" className="block text-sm font-medium text-gray-700 mb-1">Символ акции</label>
-              <input
+              <label htmlFor="symbolFilter" className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Символ акции</label>
+              <Input
                 type="text"
                 id="symbolFilter"
                 value={symbolFilter}
                 onChange={(e) => setSymbolFilter(e.target.value)}
                 placeholder="Введите символ"
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                size="sm"
               />
             </div>
             
             {/* Фильтр по прибыльности */}
             <div>
-              <label htmlFor="profitabilityFilter" className="block text-sm font-medium text-gray-700 mb-1">Прибыльность</label>
-              <select
+              <label htmlFor="profitabilityFilter" className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Прибыльность</label>
+              <Select
                 id="profitabilityFilter"
                 value={profitabilityFilter}
                 onChange={(e) => setProfitabilityFilter(e.target.value)}
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                size="sm"
               >
                 <option value="all">Все сделки</option>
                 <option value="profitable">Прибыльные</option>
                 <option value="unprofitable">Убыточные</option>
-              </select>
+              </Select>
             </div>
             
             {/* Вторая строка фильтров */}
             {/* Фильтр по диапазону дат */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Период сделок</label>
+              <label className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Период сделок</label>
               <div className="flex space-x-2">
-                <input
+                <Input
                   type="date"
                   value={dateRangeFilter.start}
                   onChange={(e) => setDateRangeFilter(prev => ({ ...prev, start: e.target.value }))}
-                  className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  size="sm"
                 />
-                <span className="text-gray-500 inline-flex items-center">—</span>
-                <input
+                <span className={`${themeClasses.text.tertiary} inline-flex items-center`}>—</span>
+                <Input
                   type="date"
                   value={dateRangeFilter.end}
                   onChange={(e) => setDateRangeFilter(prev => ({ ...prev, end: e.target.value }))}
-                  className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  size="sm"
                 />
               </div>
             </div>
             
             {/* Фильтр по размеру позиции */}
             <div>
-              <label htmlFor="positionSizeFilter" className="block text-sm font-medium text-gray-700 mb-1">Размер позиции</label>
-              <select
+              <label htmlFor="positionSizeFilter" className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>Размер позиции</label>
+              <Select
                 id="positionSizeFilter"
                 value={positionSizeFilter}
                 onChange={(e) => setPositionSizeFilter(e.target.value)}
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                size="sm"
               >
                 <option value="all">Любой размер</option>
                 <option value="small">Маленькие</option>
                 <option value="medium">Средние</option>
                 <option value="large">Большие</option>
-              </select>
+              </Select>
             </div>
             
             {/* Группировка и сброс фильтров */}
@@ -541,9 +548,9 @@ function TradeList() {
                   type="checkbox" 
                   checked={groupByMonth} 
                   onChange={(e) => handleGroupByMonthChange(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className={`h-4 w-4 text-purple-600 ${themeClasses.border.primary} rounded ${themeClasses.interactive.focus}`}
                 />
-                <span className="ml-2 text-sm text-gray-700">Группировать по месяцам</span>
+                <span className={`ml-2 text-sm ${themeClasses.text.primary}`}>Группировать по месяцам</span>
               </label>
               
               <label className="flex items-center cursor-pointer">
@@ -551,12 +558,14 @@ function TradeList() {
                   type="checkbox" 
                   checked={groupByEntryPrice} 
                   onChange={(e) => handleGroupByEntryPriceChange(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className={`h-4 w-4 text-purple-600 ${themeClasses.border.primary} rounded ${themeClasses.interactive.focus}`}
                 />
-                <span className="ml-2 text-sm text-gray-700">Группировать по цене входа</span>
+                <span className={`ml-2 text-sm ${themeClasses.text.primary}`}>Группировать по цене входа</span>
               </label>
               
-              <button 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   setSymbolFilter('');
                   setDateRangeFilter({ start: '', end: '' });
@@ -564,55 +573,55 @@ function TradeList() {
                   setPositionSizeFilter('all');
                   setFilter('');
                 }}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
               >
                 Сбросить фильтры
-              </button>
+              </Button>
             </div>
           </div>
           
           {/* Индикатор активных фильтров */}
           {(filter || symbolFilter || dateRangeFilter.start || dateRangeFilter.end || profitabilityFilter !== 'all' || positionSizeFilter !== 'all') && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-xs text-gray-500">Активные фильтры:</span>
+              <span className={`text-xs ${themeClasses.text.tertiary}`}>Активные фильтры:</span>
               {filter && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   Поиск: {filter}
-                </span>
+                </Badge>
               )}
               {symbolFilter && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   Символ: {symbolFilter}
-                </span>
+                </Badge>
               )}
               {dateRangeFilter.start && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   С: {dateRangeFilter.start}
-                </span>
+                </Badge>
               )}
               {dateRangeFilter.end && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   По: {dateRangeFilter.end}
-                </span>
+                </Badge>
               )}
               {profitabilityFilter !== 'all' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   {profitabilityFilter === 'profitable' ? 'Прибыльные' : 'Убыточные'}
-                </span>
+                </Badge>
               )}
               {positionSizeFilter !== 'all' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                <Badge variant="info" size="sm">
                   Размер: {positionSizeFilter === 'small' ? 'Маленькие' : positionSizeFilter === 'medium' ? 'Средние' : 'Большие'}
-                </span>
+                </Badge>
               )}
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {/* Расширенные элементы управления сортировкой и группировкой */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="text-sm font-medium text-gray-700">Сортировать по:</div>
+      <Card className="mb-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className={`text-sm font-medium ${themeClasses.text.primary}`}>Сортировать по:</div>
         <div className="flex gap-2 flex-wrap">
           <Button 
             variant={sortBy === 'entryDate' ? 'primary' : 'outline'} 
@@ -681,22 +690,23 @@ function TradeList() {
           </Button>
         </div>
       </div>
+      </Card>
       
       {/* Панель выбора сделок */}
-      <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
+      <div className={`flex justify-between items-center mb-4 pb-4 ${themeClasses.border.primary}`}>
         <div className="flex items-center">
           <input
             type="checkbox"
             checked={selectAllChecked}
             onChange={(e) => handleSelectAll(e.target.checked)}
-            className="h-5 w-5 text-purple-600 rounded border-gray-300 focus:ring-purple-500 mr-2"
+            className={`h-5 w-5 text-purple-600 rounded ${themeClasses.border.primary} focus:ring-purple-500 mr-2`}
           />
-          <label className="text-sm font-medium text-gray-700">
+          <label className={`text-sm font-medium ${themeClasses.text.primary}`}>
             {selectAllChecked ? 'Снять выбор' : 'Выбрать все'} 
           </label>
           
           {getSelectedTradesCount() > 0 && (
-            <span className="ml-2 text-sm text-gray-500">
+            <span className={`ml-2 text-sm ${themeClasses.text.secondary}`}>
               (Выбрано: {getSelectedTradesCount()})
             </span>
           )}
@@ -722,41 +732,41 @@ function TradeList() {
 
       {/* Trades Grid */}
       {filteredAndSortedTrades.length === 0 ? (
-        <div className="bg-white rounded-xl p-8 text-center border border-gray-200 shadow-sm">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <Card className="text-center py-8">
+          <svg className={`mx-auto h-12 w-12 ${themeClasses.text.tertiary}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
-          <h3 className="mt-2 text-lg font-medium text-gray-900">Сделок не найдено</h3>
-          <p className="mt-1 text-gray-500">
+          <h3 className={`mt-2 text-lg font-medium ${themeClasses.text.primary}`}>Сделок не найдено</h3>
+          <p className={`mt-1 ${themeClasses.text.secondary}`}>
             Начните с создания новой сделки или измените параметры поиска.
           </p>
-        </div>
+        </Card>
       ) : (groupByMonth || groupByEntryPrice) ? (
         // Сделки сгруппированы по месяцам или цене входа
         <div className="space-y-4">
           {Object.entries(groupedTrades).map(([groupKey, group]) => (
-            <div key={groupKey} className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            <Card key={groupKey} className="overflow-hidden">
               <div
-                className="p-4 flex justify-between items-center bg-gray-50 cursor-pointer"
+                className={`p-4 flex justify-between items-center ${themeClasses.background.secondary} cursor-pointer`}
                 onClick={() => toggleGroup(groupKey)}
               >
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-bold text-gray-900 capitalize">{group.label}</h3>
+                  <h3 className={`text-lg font-bold ${themeClasses.text.primary} capitalize`}>{group.label}</h3>
                   <div className="flex gap-2 items-center text-sm">
-                    <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                    <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
                       {group.totalQuantity} шт.
                     </span>
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
                       {group.totalSum.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-500">
+                  <div className={`text-sm ${themeClasses.text.secondary}`}>
                     {group.trades.length} сделок
                   </div>
                   <svg
-                    className={`h-5 w-5 text-gray-500 transition-transform ${collapsedGroups[groupKey] ? 'rotate-180' : ''}`}
+                    className={`h-5 w-5 ${themeClasses.text.secondary} transition-transform ${collapsedGroups[groupKey] ? 'rotate-180' : ''}`}
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 20 20"
                     fill="currentColor"
@@ -775,7 +785,7 @@ function TradeList() {
                   {group.trades.map(trade => renderTrade(trade))}
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       ) : (
@@ -788,19 +798,19 @@ function TradeList() {
       {/* Sell Modal */}
       {sellingTrade && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">Закрыть сделку {sellingTrade.symbol}</h3>
+          <Card className="max-w-md w-full" padding="lg">
+            <h3 className={`text-lg font-bold mb-4 ${themeClasses.text.primary}`}>Закрыть сделку {sellingTrade.symbol}</h3>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className={`block text-sm font-medium ${themeClasses.text.primary} mb-1`}>
                 Цена выхода (₽)
               </label>
-              <input
+              <Input
                 type="number"
                 min="0"
                 step="0.01"
                 value={sellPrice}
                 onChange={(e) => setSellPrice(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                className="w-full"
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -820,7 +830,7 @@ function TradeList() {
                 Закрыть сделку
               </Button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </div>
@@ -875,10 +885,10 @@ function TradeList() {
     return (
       <div
         key={trade.id}
-        className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
+        className={`${themeClasses.background.primary} rounded-xl overflow-hidden ${themeClasses.border.primary} border shadow-sm hover:shadow-md ${themeClasses.transition}`}
       >
         {/* Card Header */}
-        <div className="p-3 flex justify-between items-center border-b border-gray-100 bg-gray-50">
+        <div className={`p-3 flex justify-between items-center ${themeClasses.border.primary} ${themeClasses.background.secondary}`}>
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -886,12 +896,12 @@ function TradeList() {
               onChange={() => handleToggleSelect(trade.id)}
               className="h-4 w-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
             />
-            <div className="text-lg font-semibold text-gray-900">{trade.symbol}</div>
-            <div className={`text-xs px-2 py-0.5 rounded-full ${isOpenTrade ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
+            <div className={`text-lg font-semibold ${themeClasses.text.primary}`}>{trade.symbol}</div>
+            <div className={`text-xs px-2 py-0.5 rounded-full ${isOpenTrade ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'}`}>
               {isOpenTrade ? 'Открыта' : 'Закрыта'}
             </div>
           </div>
-          <div className="text-sm text-gray-600">
+          <div className={`text-sm ${themeClasses.text.secondary}`}>
             {format(parseDateLocal(trade.entryDate), 'd MMM yyyy', { locale: ru })}
           </div>
         </div>
@@ -901,15 +911,15 @@ function TradeList() {
           <div className="grid grid-cols-2 gap-2 text-sm">
             {/* Первая строка: цены */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Вход:</span>
-              <span className="font-medium">
+              <span className={themeClasses.text.secondary}>Вход:</span>
+              <span className={`font-medium ${themeClasses.text.primary}`}>
                 {Number(trade.entryPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
               </span>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Выход:</span>
-              <span className="font-medium">
+              <span className={themeClasses.text.secondary}>Выход:</span>
+              <span className={`font-medium ${themeClasses.text.primary}`}>
                 {trade.exitPrice
                   ? Number(trade.exitPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })
                   : '—'}
@@ -918,41 +928,41 @@ function TradeList() {
             
             {/* Вторая строка: количество и сумма */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Кол-во:</span>
-              <span className="font-medium">{trade.quantity}</span>
+              <span className={themeClasses.text.secondary}>Кол-во:</span>
+              <span className={`font-medium ${themeClasses.text.primary}`}>{trade.quantity}</span>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Сумма:</span>
-              <span className="font-medium">
+              <span className={themeClasses.text.secondary}>Сумма:</span>
+              <span className={`font-medium ${themeClasses.text.primary}`}>
                 {roundedTotalCost.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
               </span>
             </div>
             
             {/* Третья строка: ставка и проценты */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Ставка:</span>
-              <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-800 text-xs font-medium">
+              <span className={themeClasses.text.secondary}>Ставка:</span>
+              <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs font-medium">
                 {trade.marginAmount}%
               </span>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Ежедн. %:</span>
-              <span className="font-medium">
+              <span className={themeClasses.text.secondary}>Ежедн. %:</span>
+              <span className={`font-medium ${themeClasses.text.primary}`}>
                 {roundedDailyInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
               </span>
             </div>
             
             {/* Четвертая строка: дни и накопленные проценты */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Дней:</span>
-              <span className="font-medium text-right max-w-[70px] truncate" title={daysHeld}>{daysHeld}</span>
+              <span className={themeClasses.text.secondary}>Дней:</span>
+              <span className={`font-medium ${themeClasses.text.primary} text-right max-w-[70px] truncate`} title={daysHeld}>{daysHeld}</span>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Накоплено %:</span>
-              <span className="font-medium text-red-600 text-right max-w-[90px] truncate" title={accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}>
+              <span className={themeClasses.text.secondary}>Накоплено %:</span>
+              <span className="font-medium text-red-600 dark:text-red-400 text-right max-w-[90px] truncate" title={accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}>
                 {accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
               </span>
             </div>
@@ -960,24 +970,24 @@ function TradeList() {
 
           {/* Блок прибыли для закрытых сделок */}
           {!isOpenTrade && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded p-2">
+            <div className={`mt-3 pt-3 border-t ${themeClasses.border.primary}`}>
+              <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded p-2">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Прибыль без %</div>
-                    <div className={`font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`text-xs ${themeClasses.text.tertiary} mb-1`}>Прибыль без %</div>
+                    <div className={`font-semibold ${profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {profit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                      <span className="text-xs ml-1 text-gray-500">
+                      <span className={`text-xs ml-1 ${themeClasses.text.tertiary}`}>
                         ({profitPercent.toFixed(1)}%)
                       </span>
                     </div>
                   </div>
                   
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Итоговая прибыль</div>
-                    <div className={`font-semibold ${profitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`text-xs ${themeClasses.text.tertiary} mb-1`}>Итоговая прибыль</div>
+                    <div className={`font-semibold ${profitAfterInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {profitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                      <span className="text-xs ml-1 text-gray-500">
+                      <span className={`text-xs ml-1 ${themeClasses.text.tertiary}`}>
                         ({profitAfterInterestPercent.toFixed(1)}%)
                       </span>
                     </div>
@@ -989,30 +999,30 @@ function TradeList() {
 
           {/* Блок потенциальной прибыли для открытых сделок при наличии курса */}
           {isOpenTrade && currentPrice && parseFloat(currentPrice) > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded p-2">
+            <div className={`mt-3 pt-3 border-t ${themeClasses.border.primary}`}>
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900 dark:to-purple-900 rounded p-2">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Потенциальная прибыль</div>
-                    <div className={`font-semibold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`text-xs ${themeClasses.text.tertiary} mb-1`}>Потенциальная прибыль</div>
+                    <div className={`font-semibold ${potentialProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                      <span className="text-xs ml-1 text-gray-500">
+                      <span className={`text-xs ml-1 ${themeClasses.text.tertiary}`}>
                         ({potentialProfitPercent.toFixed(1)}%)
                       </span>
                     </div>
                   </div>
                   
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">После вычета %</div>
-                    <div className={`font-semibold ${potentialProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`text-xs ${themeClasses.text.tertiary} mb-1`}>После вычета %</div>
+                    <div className={`font-semibold ${potentialProfitAfterInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {potentialProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                      <span className="text-xs ml-1 text-gray-500">
+                      <span className={`text-xs ml-1 ${themeClasses.text.tertiary}`}>
                         ({potentialProfitAfterInterestPercent.toFixed(1)}%)
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="text-xs text-right text-gray-500 mt-1">
+                <div className={`text-xs text-right ${themeClasses.text.tertiary} mt-1`}>
                   При курсе {parseFloat(currentPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
                 </div>
               </div>
@@ -1021,9 +1031,9 @@ function TradeList() {
 
           {/* Заметки, если есть */}
           {trade.notes && (
-            <div className="mt-3 pt-2 border-t border-gray-100">
-              <div className="text-xs text-gray-500">Заметки</div>
-              <div className="text-sm text-gray-700 italic">{trade.notes}</div>
+            <div className={`mt-3 pt-2 border-t ${themeClasses.border.primary}`}>
+              <div className={`text-xs ${themeClasses.text.tertiary}`}>Заметки</div>
+              <div className={`text-sm ${themeClasses.text.secondary} italic`}>{trade.notes}</div>
             </div>
           )}
 
