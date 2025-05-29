@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: theme('colors.brand.blue.500');
+    --color-primary-light: theme('colors.brand.blue.400');
+    --color-primary-dark: theme('colors.brand.blue.600');
+    --color-secondary: theme('colors.brand.green.500');
+    --color-accent: theme('colors.brand.yellow.500');
+    --color-danger: theme('colors.brand.red.500');
+  }
+
+  html {
+    @apply antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv09';
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  /* Шрифт Inter для банковского стиля */
+  @font-face {
+    font-family: 'Inter var';
+    font-weight: 100 900;
+    font-display: swap;
+    font-style: normal;
+    src: url('https://rsms.me/inter/font-files/Inter-roman.var.woff2?v=3.19') format('woff2');
+  }
+}
+
+@layer components {
+  /* Карточки в стиле банковских интерфейсов */
+  .bank-card {
+    @apply bg-white rounded-2xl shadow-card transition-all duration-300 p-6 border border-gray-100 hover:shadow-card-hover;
+  }
+
+  /* Кнопки в стиле банковских приложений */
+  .btn {
+    @apply px-5 py-3 rounded-xl font-medium transition-all duration-200 shadow-button inline-flex items-center justify-center;
+  }
+  
+  .btn-primary {
+    @apply bg-brand-blue-500 text-white hover:bg-brand-blue-600 active:bg-brand-blue-700 focus:ring-2 focus:ring-brand-blue-300 focus:outline-none;
+  }
+  
+  .btn-secondary {
+    @apply bg-brand-green-500 text-white hover:bg-brand-green-600 active:bg-brand-green-700 focus:ring-2 focus:ring-brand-green-300 focus:outline-none;
+  }
+
+  .btn-accent {
+    @apply bg-brand-yellow-500 text-gray-900 hover:bg-brand-yellow-400 active:bg-brand-yellow-600 focus:ring-2 focus:ring-brand-yellow-300 focus:outline-none;
+  }
+
+  .btn-outline {
+    @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100 focus:ring-2 focus:ring-gray-200 focus:outline-none;
+  }
+
+  .btn-danger {
+    @apply bg-brand-red-500 text-white hover:bg-brand-red-600 active:bg-brand-red-700 focus:ring-2 focus:ring-brand-red-300 focus:outline-none;
+  }
+
+  /* Small button variant for consistent sizing */
+  .btn-sm {
+    @apply py-1 px-3 text-sm;
+  }
+
+  /* Инпуты в стиле банковских приложений */
+  .input {
+    @apply w-full rounded-xl border-gray-300 shadow-sm focus:border-brand-blue-400 focus:ring focus:ring-brand-blue-200 focus:ring-opacity-50 transition-colors duration-200;
+  }
+
+  /* Стилизация таблиц */
+  .bank-table {
+    @apply w-full border-collapse table-fixed;
+  }
+
+  .bank-table th {
+    @apply text-left text-sm uppercase tracking-wider py-4 px-4 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-600 font-medium border-b border-gray-200 whitespace-nowrap transition-colors duration-150 first:rounded-tl-xl last:rounded-tr-xl;
+  }
+
+  .bank-table td {
+    @apply py-4 px-4 border-b border-gray-100 transition-colors duration-150;
+  }
+
+  .bank-table tr:hover td {
+    @apply bg-blue-50/50;
+  }
+  
+  /* Добавляем стили для заголовка при наведении */
+  .bank-table th.cursor-pointer:hover {
+    @apply bg-gradient-to-b from-gray-100 to-gray-200 text-gray-800;
+  }
+
+  /* Бейджи и статусы */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-brand-green-100 text-brand-green-800;
+  }
+
+  .badge-danger {
+    @apply bg-brand-red-100 text-brand-red-800;
+  }
+
+  .badge-warning {
+    @apply bg-brand-yellow-100 text-brand-yellow-800;
+  }
+
+  .badge-info {
+    @apply bg-brand-blue-100 text-brand-blue-800;
+  }
+}
