@@ -12,6 +12,7 @@ import {
 // Импорт унифицированных компонентов и дизайн-системы
 import { Button, Card, Input, Select, Badge } from './ui';
 import { themeClasses } from '../styles/designSystem';
+import DraggableTradeRow from './DraggableTradeRow';
 
 function TradeList() {
   const [trades, setTrades] = useState([]);
@@ -30,6 +31,7 @@ function TradeList() {
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockPrices, setStockPrices] = useState({});
+  const [isDragMode, setIsDragMode] = useState(false);
   
   // Состояния для дополнительных фильтров
   const [isFilterPanelExpanded, setIsFilterPanelExpanded] = useState(false);
@@ -86,6 +88,18 @@ function TradeList() {
 
   const getCurrentPrice = (symbol) => {
     return stockPrices[symbol] || '';
+  };
+
+  // Обработчик изменения порядка сделок при drag & drop
+  const handleReorderTrades = (oldIndex, newIndex) => {
+    const reorderedTrades = [...filteredAndSortedTrades];
+    const [movedTrade] = reorderedTrades.splice(oldIndex, 1);
+    reorderedTrades.splice(newIndex, 0, movedTrade);
+    
+    // Обновляем состояние trades с новым порядком
+    // Это простая демонстрация - в реальном приложении 
+    // вы можете отправить новый порядок на сервер
+    setTrades(reorderedTrades);
   };
 
   // Мемоизированная фильтрация и сортировка сделок
@@ -413,6 +427,16 @@ function TradeList() {
       <div className="flex justify-between items-center mb-4">
         <h1 className={`text-2xl font-bold ${themeClasses.text.primary}`}>Список сделок</h1>
         <div className="flex space-x-2">
+          <Button
+            variant={isDragMode ? "primary" : "secondary"}
+            size="sm"
+            onClick={() => setIsDragMode(!isDragMode)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+            </svg>
+            {isDragMode ? 'Выйти из режима перетаскивания' : 'Режим перетаскивания'}
+          </Button>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <svg className={`h-5 w-5 ${themeClasses.text.tertiary}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -790,9 +814,19 @@ function TradeList() {
         </div>
       ) : (
         // Сделки без группировки
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAndSortedTrades.map(trade => renderTrade(trade))}
-        </div>
+        isDragMode ? (
+          // Режим drag & drop
+          <DraggableTradeRow
+            trades={filteredAndSortedTrades}
+            onReorder={handleReorderTrades}
+            renderTrade={renderTrade}
+          />
+        ) : (
+          // Обычный список
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAndSortedTrades.map(trade => renderTrade(trade))}
+          </div>
+        )
       )}
 
       {/* Sell Modal */}

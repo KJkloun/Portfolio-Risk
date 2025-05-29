@@ -45,26 +45,26 @@ const useKeyboardShortcuts = (shortcuts = {}) => {
 // Предустановленные комбинации клавиш
 export const SHORTCUTS = {
   // Навигация
-  NEW_TRADE: 'cmd+n',
-  SAVE: 'cmd+s',
-  EDIT: 'cmd+e',
-  DELETE: 'cmd+d',
-  SEARCH: 'cmd+f',
+  NEW_TRADE: 'alt+n',
+  SAVE: 'alt+s',
+  EDIT: 'alt+e',
+  DELETE: 'alt+d',
+  SEARCH: 'alt+f',
   
   // Быстрые действия
-  QUICK_ENTRY: 'cmd+shift+n',
-  BULK_IMPORT: 'cmd+shift+i',
-  EXPORT_PDF: 'cmd+shift+p',
+  QUICK_ENTRY: 'alt+shift+n',
+  BULK_IMPORT: 'alt+shift+i',
+  EXPORT_PDF: 'alt+shift+p',
   
   // UI
-  TOGGLE_THEME: 'cmd+shift+t',
+  TOGGLE_THEME: 'alt+shift+t',
   CLOSE_MODAL: 'escape',
   
   // Вкладки/страницы
-  TRADES_TAB: 'cmd+1',
-  STATISTICS_TAB: 'cmd+2',
-  PRICES_TAB: 'cmd+3',
-  IMPORT_TAB: 'cmd+4',
+  TRADES_TAB: 'alt+1',
+  STATISTICS_TAB: 'alt+2',
+  PRICES_TAB: 'alt+3',
+  IMPORT_TAB: 'alt+4',
 };
 
 // Хелпер для отображения комбинаций клавиш в UI
@@ -75,8 +75,10 @@ export const formatShortcut = (shortcut) => {
     .replace('cmd', isMac ? '⌘' : 'Ctrl')
     .replace('alt', isMac ? '⌥' : 'Alt')
     .replace('shift', isMac ? '⇧' : 'Shift')
-    .replace('+', ' + ')
-    .toUpperCase();
+    .replace(/\+/g, ' + ')  // Заменяем все + на пробелы с +
+    .split(' + ')           // Разделяем по +
+    .map(part => part.toUpperCase())  // Делаем каждую часть заглавной
+    .join(' + ');           // Соединяем обратно
 };
 
 export default useKeyboardShortcuts; 
