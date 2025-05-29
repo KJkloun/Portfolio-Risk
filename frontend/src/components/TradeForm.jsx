@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import axios from 'axios';
@@ -9,9 +9,10 @@ import {
   calculateYearlyInterest, 
   calculateDailyInterest 
 } from '../utils/calculations';
+import useKeyboardShortcuts, { SHORTCUTS, formatShortcut } from '../hooks/useKeyboardShortcuts';
 
 // Импорт унифицированных компонентов и дизайн-системы
-import { Card, Button, Input } from './ui';
+import { Card, Button, Input, StockSelect } from './ui';
 import { themeClasses } from '../styles/designSystem';
 
 const schema = yup.object().shape({
@@ -28,21 +29,63 @@ function TradeForm() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calculation, setCalculation] = useState(null);
+  const [existingStocks, setExistingStocks] = useState([]);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     watch,
+    control,
+    setValue,
+    trigger
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       symbol: '',
       entryPrice: '',
-  quantity: '',
+      quantity: '',
       creditRate: '',
       entryDate: new Date().toISOString().split('T')[0], // Сегодняшняя дата по умолчанию
       notes: ''
+    }
+  });
+
+  // Загружаем существующие тикеры для автодополнения
+  useEffect(() => {
+    const loadExistingStocks = async () => {
+      try {
+        const response = await axios.get('/api/trades');
+        const uniqueStocks = [...new Set(response.data.map(trade => trade.symbol))];
+        setExistingStocks(uniqueStocks);
+      } catch (err) {
+        console.error('Error loading existing stocks:', err);
+      }
+    };
+    
+    loadExistingStocks();
+  }, []);
+
+  // Клавиатурные сочетания
+  useKeyboardShortcuts({
+    [SHORTCUTS.SAVE]: {
+      action: () => handleSubmit(onSubmit)(),
+      allowInInput: true
+    },
+    [SHORTCUTS.NEW_TRADE]: {
+      action: () => {
+        // Сброс формы
+        setValue('symbol', '');
+        setValue('entryPrice', '');
+        setValue('quantity', '');
+        setValue('creditRate', '');
+        setValue('notes', '');
+        document.querySelector('[data-testid="stock-select"]')?.focus();
+      }
+    },
+    'escape': {
+      action: () => navigate('/'),
+      allowInInput: true
     }
   });
 
@@ -110,7 +153,16 @@ function TradeForm() {
   return (
     <div className={`min-h-screen ${themeClasses.background.secondary} ${themeClasses.transition}`}>
       <div className="p-6 max-w-4xl mx-auto">
-        <h1 className={`text-2xl font-medium ${themeClasses.text.primary} mb-8`}>Новая сделка</h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className={`text-2xl font-medium ${themeClasses.text.primary}`}>Новая сделка</h1>
+          
+          {/* Подсказки по клавиатурным сочетаниям */}
+          <div className={`text-xs ${themeClasses.text.tertiary} space-x-4 hidden sm:flex`}>
+            <span>{formatShortcut(SHORTCUTS.SAVE)} - Сохранить</span>
+            <span>{formatShortcut(SHORTCUTS.NEW_TRADE)} - Очистить</span>
+            <span>ESC - Отмена</span>
+          </div>
+        </div>
           
         <Card>
           {error && (
@@ -123,14 +175,28 @@ function TradeForm() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
                 <label className={`block text-sm font-medium ${themeClasses.text.primary} mb-2`} htmlFor="symbol">
-                  Тикер
+                  Тикер акции
                 </label>
-                <input
-                  id="symbol"
-                  type="text"
-                  placeholder="SBER"
-                  className={`w-full px-3 py-2 ${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.border.primary} border rounded-md text-sm ${themeClasses.transition} ${themeClasses.interactive.focus} ${errors.symbol ? 'border-red-300 dark:border-red-600 focus:border-red-400 dark:focus:border-red-500 focus:ring-red-400 dark:focus:ring-red-500' : ''}`}
-                  {...register('symbol')}
+                <Controller
+                  name="symbol"
+                  control={control}
+                  render={({ field }) => (
+                    <StockSelect
+                      {...field}
+                      data-testid="stock-select"
+                      existingStocks={existingStocks}
+                      placeholder="Введите тикер (например, SBER)..."
+                      onChange={(value) => {
+                        field.onChange(value);
+                        // Автофокус на следующее поле после выбора
+                        if (value) {
+                          setTimeout(() => {
+                            document.getElementById('quantity')?.focus();
+                          }, 100);
+                        }
+                      }}
+                    />
+                  )}
                 />
                 {errors.symbol && (
                   <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.symbol.message}</p>
@@ -150,6 +216,12 @@ function TradeForm() {
                   onChange={(e) => {
                     register('quantity').onChange(e);
                     setTimeout(calculateCredit, 100);
+                  }}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      document.getElementById('entryPrice')?.focus();
+                    }
                   }}
                 />
                 {errors.quantity && (
@@ -176,6 +248,12 @@ function TradeForm() {
                       register('entryPrice').onChange(e);
                       setTimeout(calculateCredit, 100);
                     }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('creditRate')?.focus();
+                      }
+                    }}
                   />
                 </div>
                 {errors.entryPrice && (
@@ -199,6 +277,12 @@ function TradeForm() {
                       register('creditRate').onChange(e);
                       setTimeout(calculateCredit, 100);
                     }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        document.getElementById('notes')?.focus();
+                      }
+                    }}
                   />
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                     <span className={`${themeClasses.text.tertiary} text-sm`}>%</span>
@@ -209,9 +293,9 @@ function TradeForm() {
                 )}
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <label className={`block text-sm font-medium ${themeClasses.text.primary} mb-2`} htmlFor="entryDate">
-                  Дата сделки
+                  Дата покупки
                 </label>
                 <input
                   id="entryDate"
@@ -224,67 +308,87 @@ function TradeForm() {
                 )}
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
                 <label className={`block text-sm font-medium ${themeClasses.text.primary} mb-2`} htmlFor="notes">
                   Заметки (опционально)
                 </label>
-                <textarea
+                <input
                   id="notes"
-                  rows={3}
-                  placeholder="Дополнительная информация о сделке..."
-                  className={`w-full px-3 py-2 ${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.border.primary} border rounded-md text-sm ${themeClasses.transition} ${themeClasses.interactive.focus} resize-none`}
+                  type="text"
+                  placeholder="Дополнительная информация..."
+                  className={`w-full px-3 py-2 ${themeClasses.background.primary} ${themeClasses.text.primary} ${themeClasses.border.primary} border rounded-md text-sm ${themeClasses.transition} ${themeClasses.interactive.focus}`}
                   {...register('notes')}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSubmit(onSubmit)();
+                    }
+                  }}
                 />
               </div>
             </div>
 
-            {/* Расчеты */}
+            {/* Расчет кредита */}
             {calculation && (
               <Card variant="secondary" className="mt-6">
-                <h3 className={`text-lg font-medium ${themeClasses.text.primary} mb-4`}>Расчет стоимости кредита</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className={`p-3 ${themeClasses.background.tertiary} rounded-lg`}>
-                    <div className={`text-sm ${themeClasses.text.secondary} mb-1`}>Общая стоимость</div>
-                    <div className={`text-lg font-semibold ${themeClasses.text.primary}`}>
-                      {calculation.totalCost.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
-                    </div>
+                <h3 className={`text-lg font-medium ${themeClasses.text.primary} mb-3`}>
+                  Расчет кредита
+                </h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <div>
+                    <p className={`text-sm ${themeClasses.text.secondary}`}>Стоимость покупки</p>
+                    <p className={`text-lg font-semibold ${themeClasses.text.primary}`}>
+                      {calculation.totalCost.toLocaleString('ru-RU', {
+                        style: 'currency',
+                        currency: 'RUB',
+                        maximumFractionDigits: 0,
+                      })}
+                    </p>
                   </div>
-                  <div className={`p-3 ${themeClasses.background.tertiary} rounded-lg`}>
-                    <div className={`text-sm ${themeClasses.text.secondary} mb-1`}>Год. процент</div>
-                    <div className={`text-lg font-semibold ${themeClasses.text.primary}`}>
-                      {calculation.yearlyInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
-                    </div>
+                  <div>
+                    <p className={`text-sm ${themeClasses.text.secondary}`}>Проценты в год</p>
+                    <p className={`text-lg font-semibold text-orange-600 dark:text-orange-400`}>
+                      {calculation.yearlyInterest.toLocaleString('ru-RU', {
+                        style: 'currency',
+                        currency: 'RUB',
+                        maximumFractionDigits: 0,
+                      })}
+                    </p>
                   </div>
-                  <div className={`p-3 ${themeClasses.background.tertiary} rounded-lg`}>
-                    <div className={`text-sm ${themeClasses.text.secondary} mb-1`}>Ежедн. процент</div>
-                    <div className={`text-lg font-semibold ${themeClasses.text.primary}`}>
-                      {calculation.dailyInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
-                    </div>
+                  <div>
+                    <p className={`text-sm ${themeClasses.text.secondary}`}>Проценты в день</p>
+                    <p className={`text-lg font-semibold text-red-600 dark:text-red-400`}>
+                      {calculation.dailyInterest.toLocaleString('ru-RU', {
+                        style: 'currency',
+                        currency: 'RUB',
+                        maximumFractionDigits: 2,
+                      })}
+                    </p>
                   </div>
                 </div>
               </Card>
             )}
 
-            <div className="flex gap-4 pt-6">
+            {/* Кнопки */}
+            <div className="flex justify-end space-x-3 pt-6">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() => navigate('/')}
-                className="flex-1 sm:flex-none"
+                disabled={isSubmitting}
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
                 variant="primary"
-                disabled={isSubmitting}
                 loading={isSubmitting}
-                className="flex-1 sm:flex-none"
+                disabled={isSubmitting}
               >
-                {isSubmitting ? 'Сохранение...' : 'Сохранить сделку'}
+                {isSubmitting ? 'Сохранение...' : 'Создать сделку'}
               </Button>
             </div>
-    </form>
+          </form>
         </Card>
       </div>
     </div>
