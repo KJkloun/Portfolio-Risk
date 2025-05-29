@@ -39,7 +39,7 @@ function TradeForm() {
     defaultValues: {
       symbol: '',
       entryPrice: '',
-      quantity: '',
+  quantity: '',
       creditRate: '',
       entryDate: new Date().toISOString().split('T')[0], // Сегодняшняя дата по умолчанию
       notes: ''
@@ -111,7 +111,7 @@ function TradeForm() {
     <div className={`min-h-screen ${themeClasses.background.secondary} ${themeClasses.transition}`}>
       <div className="p-6 max-w-4xl mx-auto">
         <h1 className={`text-2xl font-medium ${themeClasses.text.primary} mb-8`}>Новая сделка</h1>
-        
+          
         <Card>
           {error && (
             <Card variant="default" className="mb-6 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30">
@@ -284,7 +284,7 @@ function TradeForm() {
                 {isSubmitting ? 'Сохранение...' : 'Сохранить сделку'}
               </Button>
             </div>
-          </form>
+    </form>
         </Card>
       </div>
     </div>

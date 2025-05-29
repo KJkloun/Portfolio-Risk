@@ -57,6 +57,10 @@ function Statistics() {
     accent3: isDark ? '#84cc16' : '#65a30d',
     accent4: isDark ? '#f97316' : '#ea580c',
     
+    // Улучшенные цвета для графиков
+    green: isDark ? '#10b981' : '#059669',
+    red: isDark ? '#ef4444' : '#dc2626',
+    
     // Цвета текста и сетки для графиков
     text: isDark ? '#d1d5db' : '#6b7280',
     grid: isDark ? '#374151' : '#f3f4f6',
@@ -1038,9 +1042,9 @@ function Statistics() {
           label: 'Количество сделок',
           data: symbols.map(symbol => stats.symbolCounts[symbol]),
           backgroundColor: symbols.map((_, index) => 
-            `rgba(79, 70, 229, ${0.5 + (index % 3) * 0.15})`
+            `${chartColors.secondary}${Math.round(0.5 + (index % 3) * 0.15).toString(16).padStart(2, '0')}`
           ),
-          borderColor: 'rgb(255, 255, 255)',
+          borderColor: isDark ? '#ffffff' : '#ffffff',
           borderWidth: 1,
           borderRadius: 6,
           borderSkipped: false,
@@ -1061,10 +1065,10 @@ function Statistics() {
           label: 'Длительность удержания (дни)',
           data: Object.values(periods),
           backgroundColor: [
-            'rgba(124, 58, 237, 0.7)',
-            'rgba(139, 92, 246, 0.7)',
-            'rgba(167, 139, 250, 0.7)',
-            'rgba(196, 181, 253, 0.7)',
+            chartColors.primary + 'B3', // 70% opacity
+            chartColors.accent1 + 'B3',
+            chartColors.accent2 + 'B3',
+            chartColors.accent3 + 'B3',
           ],
           borderWidth: 0,
         },
@@ -1079,10 +1083,10 @@ function Statistics() {
         {
           data: [stats.totalTradesOpen, stats.totalTradesClosed],
           backgroundColor: [
-            'rgba(124, 58, 237, 0.7)',
-            'rgba(79, 70, 229, 0.7)',
+            chartColors.primary + 'B3', // 70% opacity
+            chartColors.secondary + 'B3',
           ],
-          borderColor: 'rgb(255, 255, 255)',
+          borderColor: isDark ? '#ffffff' : '#ffffff',
           borderWidth: 2,
         },
       ],
@@ -1120,8 +1124,8 @@ function Statistics() {
         {
           label: 'Среднедневная прибыль',
           data: dailyProfits,
-          backgroundColor: 'rgba(124, 58, 237, 0.7)',
-          borderColor: 'rgba(124, 58, 237, 1)',
+          backgroundColor: chartColors.primary + 'B3', // 70% opacity
+          borderColor: chartColors.primary,
           borderWidth: 2,
           tension: 0.4,
           fill: true,
@@ -1163,8 +1167,8 @@ function Statistics() {
         {
           label: 'ROI (%)',
           data: monthlyROI,
-          backgroundColor: 'rgba(79, 70, 229, 0.7)',
-          borderColor: 'rgba(79, 70, 229, 1)',
+          backgroundColor: chartColors.secondary + 'B3', // 70% opacity
+          borderColor: chartColors.secondary,
           borderWidth: 2,
           borderRadius: 4,
         }
@@ -1223,7 +1227,7 @@ function Statistics() {
         labels: ['Нет данных'],
         datasets: [{
           data: [1],
-          backgroundColor: ['#e5e7eb'],
+          backgroundColor: [isDark ? '#374151' : '#e5e7eb'],
           borderWidth: 0
         }]
       };
@@ -1234,7 +1238,7 @@ function Statistics() {
       datasets: [{
         data: [openCount, closedCount],
         backgroundColor: [chartColors.primary, chartColors.secondary],
-        borderColor: '#ffffff',
+        borderColor: isDark ? '#ffffff' : '#ffffff',
         borderWidth: 2,
         hoverOffset: 8
       }]
@@ -1270,7 +1274,6 @@ function Statistics() {
     const rangeSize = range / 5;
     const ranges = [];
     const rangeCounts = [];
-    const rangeColors = [];
     
     for (let i = 0; i < 5; i++) {
       const rangeStart = minPrice + (rangeSize * i);
@@ -1283,7 +1286,6 @@ function Statistics() {
       
       ranges.push(`${rangeStart.toFixed(0)}-${rangeEnd.toFixed(0)}₽`);
       rangeCounts.push(tradesInRange);
-      rangeColors.push(`rgba(124, 58, 237, ${0.4 + (tradesInRange / stockTrades.length) * 0.6})`);
     }
     
     return {
@@ -1291,7 +1293,10 @@ function Statistics() {
       datasets: [{
         label: 'Количество сделок в диапазоне цен',
         data: rangeCounts,
-        backgroundColor: rangeColors,
+        backgroundColor: rangeCounts.map((count, index) => {
+          const intensity = 0.4 + (count / Math.max(...rangeCounts)) * 0.6;
+          return chartColors.primary + Math.round(intensity * 255).toString(16).padStart(2, '0');
+        }),
         borderColor: chartColors.secondary,
         borderWidth: 1,
         borderRadius: 6
@@ -1337,7 +1342,8 @@ function Statistics() {
     const finalProfit = data[data.length - 1];
     const lineColor = finalProfit >= 0 ? chartColors.green : chartColors.red;
     const gradientColor = finalProfit >= 0 ? 
-      'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+      (isDark ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)') : 
+      (isDark ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.1)');
     
     return {
       labels,
@@ -1351,7 +1357,7 @@ function Statistics() {
         pointRadius: 0,
         pointHoverRadius: 6,
         pointHoverBackgroundColor: lineColor,
-        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderColor: isDark ? '#ffffff' : '#ffffff',
         pointHoverBorderWidth: 2,
         fill: true
       }]
@@ -1368,13 +1374,13 @@ function Statistics() {
 
   return (
     <div className={`min-h-screen ${themeClasses.background.secondary} ${themeClasses.transition}`}>
-      <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
         <h1 className={`text-2xl font-medium ${themeClasses.text.primary} mb-8`}>
           Статистика торговли
         </h1>
 
-        {/* Error message */}
-        {error && (
+      {/* Error message */}
+      {error && (
           <Card variant="default" className="mb-6 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30">
             <p className="text-red-700 dark:text-red-300">{error}</p>
           </Card>
@@ -1384,21 +1390,21 @@ function Statistics() {
         <div className="flex items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <label htmlFor="stockFilter" className={`text-sm ${themeClasses.text.secondary}`}>
-              Акция:
-            </label>
+            Акция:
+          </label>
             <Select
-              id="stockFilter"
-              value={selectedStock}
-              onChange={(e) => handleStockChange(e.target.value)}
+            id="stockFilter"
+            value={selectedStock}
+            onChange={(e) => handleStockChange(e.target.value)}
               size="sm"
               className="min-w-32"
-            >
-              <option value="all">Все акции</option>
-              {availableStocks.map(symbol => (
-                <option key={symbol} value={symbol}>{symbol}</option>
-              ))}
+          >
+            <option value="all">Все акции</option>
+            {availableStocks.map(symbol => (
+              <option key={symbol} value={symbol}>{symbol}</option>
+            ))}
             </Select>
-          </div>
+        </div>
 
           <div className="flex">
             <Button
@@ -1422,19 +1428,19 @@ function Statistics() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </Button>
-          </div>
         </div>
+      </div>
 
         {/* Current Stock Prices */}
-        {Object.keys(stockPrices).length > 0 && (
+      {Object.keys(stockPrices).length > 0 && (
           <Card className="mb-8">
             <div className={`font-medium ${themeClasses.text.primary} mb-3`}>
               Текущие курсы акций:
             </div>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(stockPrices)
-                .filter(([_, price]) => price && !isNaN(parseFloat(price)))
-                .map(([symbol, price]) => (
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stockPrices)
+              .filter(([_, price]) => price && !isNaN(parseFloat(price)))
+              .map(([symbol, price]) => (
                   <Badge key={symbol} variant="default" size="sm">
                     {symbol}: {parseFloat(price).toLocaleString('ru-RU', { 
                       style: 'currency', 
@@ -1442,14 +1448,14 @@ function Statistics() {
                       maximumFractionDigits: 2 
                     })}
                   </Badge>
-                ))}
-            </div>
+              ))}
+          </div>
           </Card>
-        )}
+      )}
 
         {/* Main Statistics */}
-        <div className="mb-8">
-          {selectedStock === 'all' ? (
+      <div className="mb-8">
+        {selectedStock === 'all' ? (
             // General statistics
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Portfolio Summary Card */}
@@ -1459,7 +1465,7 @@ function Statistics() {
                 </h3>
                 <div className="space-y-4">
                   {/* Basic portfolio info */}
-                  <div>
+          <div>
                     <div className="flex justify-between text-sm mb-2">
                       <span className={themeClasses.text.secondary}>Стоимость позиций</span>
                       <span className={`font-medium ${themeClasses.text.primary}`}>
@@ -1469,26 +1475,26 @@ function Statistics() {
                           maximumFractionDigits: 0 
                         })}
                       </span>
-                    </div>
+                </div>
                     <div className="flex justify-between text-sm mb-2">
                       <span className={themeClasses.text.secondary}>Активных акций</span>
                       <span className={`font-medium ${themeClasses.text.primary}`}>
                         {stats.totalSharesOpen}
                       </span>
-                    </div>
+              </div>
                     <div className="flex justify-between text-sm">
                       <span className={themeClasses.text.secondary}>Средняя ставка</span>
                       <span className={`font-medium ${themeClasses.text.primary}`}>
                         {stats.avgCreditRate.toFixed(2)}%
                       </span>
-                    </div>
-                  </div>
-                  
+                </div>
+              </div>
+              
                   {/* Profit breakdown */}
                   <div className={`border-t ${themeClasses.border.primary} pt-4`}>
                     <div className={`text-sm font-medium ${themeClasses.text.primary} mb-3`}>
                       Прибыль:
-                    </div>
+                </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className={themeClasses.text.secondary}>Зафиксированная</span>
@@ -1503,7 +1509,7 @@ function Statistics() {
                             maximumFractionDigits: 0 
                           })}
                         </span>
-                      </div>
+              </div>
                       <div className="flex justify-between text-sm">
                         <span className={themeClasses.text.secondary}>Потенциальная</span>
                         <span className={`font-medium ${
@@ -1531,15 +1537,15 @@ function Statistics() {
                             maximumFractionDigits: 0 
                           })}
                         </span>
-                      </div>
-                    </div>
-                  </div>
-                  
+                </div>
+              </div>
+            </div>
+            
                   {/* Interest costs */}
                   <div className={`border-t ${themeClasses.border.primary} pt-4`}>
                     <div className={`text-sm font-medium ${themeClasses.text.primary} mb-3`}>
                       Проценты:
-                    </div>
+                </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className={themeClasses.text.secondary}>Заплачено по закрытым</span>
@@ -1550,7 +1556,7 @@ function Statistics() {
                             maximumFractionDigits: 0
                           })}
                         </span>
-                      </div>
+              </div>
                       <div className="flex justify-between text-sm">
                         <span className={themeClasses.text.secondary}>Накоплено по открытым</span>
                         <span className="text-red-500 dark:text-red-400">
@@ -1560,7 +1566,7 @@ function Statistics() {
                             maximumFractionDigits: 0
                           })}
                         </span>
-                      </div>
+                </div>
                       <div className={`flex justify-between text-sm pt-2 border-t ${themeClasses.border.primary}`}>
                         <span className={`font-medium ${themeClasses.text.primary}`}>Итого после %</span>
                         <span className={`font-bold ${
@@ -1574,9 +1580,9 @@ function Statistics() {
                             maximumFractionDigits: 0 
                           })}
                         </span>
-                      </div>
-                    </div>
-                  </div>
+              </div>
+                </div>
+              </div>
                 </div>
               </Card>
               
@@ -1593,7 +1599,7 @@ function Statistics() {
                       <span className={`font-medium ${themeClasses.text.primary}`}>
                         {stats.totalTradesOpen}
                       </span>
-                    </div>
+                </div>
                     <div className="flex justify-between text-sm mb-2">
                       <span className={themeClasses.text.secondary}>Закрытые сделки</span>
                       <span className={`font-medium ${themeClasses.text.primary}`}>
@@ -1605,15 +1611,15 @@ function Statistics() {
                       <span className={`font-medium ${themeClasses.text.primary}`}>
                         {stats.totalTradesOpen + stats.totalTradesClosed}
                       </span>
-                    </div>
-                  </div>
+              </div>
+            </div>
 
                   {/* Performance metrics */}
                   <div className={`border-t ${themeClasses.border.primary} pt-4`}>
                     <div className={`text-sm font-medium ${themeClasses.text.primary} mb-3`}>
                       Эффективность:
                     </div>
-                    <div className="space-y-2">
+                <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className={themeClasses.text.secondary}>Успешность</span>
                         <span className={`font-medium ${themeClasses.text.primary}`}>
@@ -1622,7 +1628,7 @@ function Statistics() {
                             : '—'
                           }
                         </span>
-                      </div>
+                  </div>
                       <div className="flex justify-between text-sm">
                         <span className={themeClasses.text.secondary}>Средняя прибыль/сделка</span>
                         <span className={`font-medium ${themeClasses.text.primary}`}>
@@ -1635,12 +1641,12 @@ function Statistics() {
                             : '—'
                           }
                         </span>
-                      </div>
+                  </div>
+                  </div>
                     </div>
                   </div>
-                </div>
               </Card>
-            </div>
+                    </div>
           ) : (
             // Stock-specific statistics
             <div>
@@ -1648,127 +1654,127 @@ function Statistics() {
                 const stockData = calculateStockMetrics(selectedStock);
                 
                 if (!stockData) return (
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 text-center">
-                    <p className="text-gray-500">Нет данных для выбранной акции</p>
-              </div>
+                  <Card className="text-center">
+                    <p className={themeClasses.text.secondary}>Нет данных для выбранной акции</p>
+                  </Card>
                 );
                 
                 return (
                   <div>
                     {/* Detailed stats for specific stock */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="bg-white p-6 rounded-lg border border-gray-200">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Портфель ({selectedStock})</h3>
+                      <Card>
+                        <h3 className={`text-lg font-medium ${themeClasses.text.primary} mb-4`}>Портфель ({selectedStock})</h3>
                         <div className="space-y-4">
                           {/* Basic info */}
                           <div>
                             <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Стоимость позиций</span>
-                              <span className="font-medium">{stockData.totalInvested.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
-                  </div>
+                              <span className={themeClasses.text.secondary}>Стоимость позиций</span>
+                              <span className={`font-medium ${themeClasses.text.primary}`}>{stockData.totalInvested.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
+                            </div>
                             <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Активных акций</span>
-                              <span className="font-medium">{stockData.totalOpenQuantity}</span>
-                    </div>
+                              <span className={themeClasses.text.secondary}>Активных акций</span>
+                              <span className={`font-medium ${themeClasses.text.primary}`}>{stockData.totalOpenQuantity}</span>
+                            </div>
                             <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Всего акций</span>
-                              <span className="font-medium">{stockData.totalQuantity}</span>
-                  </div>
-                    </div>
-                          
+                              <span className={themeClasses.text.secondary}>Всего акций</span>
+                              <span className={`font-medium ${themeClasses.text.primary}`}>{stockData.totalQuantity}</span>
+                            </div>
+                          </div>
+              
                           {/* Profit breakdown */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Прибыль:</div>
+                          <div className={`border-t ${themeClasses.border.primary} pt-4`}>
+                            <div className={`text-sm font-medium ${themeClasses.text.primary} mb-3`}>Прибыль:</div>
                             <div className="space-y-2">
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Зафиксированная</span>
-                                <span className={stockData.totalProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                                <span className={themeClasses.text.secondary}>Зафиксированная</span>
+                                <span className={stockData.totalProfit >= 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
                                   {stockData.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                                 </span>
-                  </div>
+                              </div>
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Потенциальная</span>
-                                <span className={stockData.potentialProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                                <span className={themeClasses.text.secondary}>Потенциальная</span>
+                                <span className={stockData.potentialProfit >= 0 ? 'text-green-600 dark:text-green-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
                                   {stockData.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                                 </span>
-                    </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Общая</span>
-                                <span className={`font-bold ${stockData.overallProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              </div>
+                              <div className={`flex justify-between text-sm pt-2 border-t ${themeClasses.border.primary}`}>
+                                <span className={`${themeClasses.text.primary} font-medium`}>Общая</span>
+                                <span className={`font-bold ${stockData.overallProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                   {stockData.overallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                                 </span>
-                  </div>
-                </div>
-              </div>
+                              </div>
+                            </div>
+                          </div>
               
                           {/* Interest costs */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Проценты:</div>
-                <div className="space-y-2">
+                          <div className={`border-t ${themeClasses.border.primary} pt-4`}>
+                            <div className={`text-sm font-medium ${themeClasses.text.primary} mb-3`}>Проценты:</div>
+                            <div className="space-y-2">
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Заплачено по закрытым</span>
-                                <span className="text-red-600 font-medium">-{stockData.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
-                    </div>
+                                <span className={themeClasses.text.secondary}>Заплачено по закрытым</span>
+                                <span className="text-red-600 dark:text-red-400 font-medium">-{stockData.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                              </div>
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Накоплено по открытым</span>
-                                <span className="text-red-500">-{stockData.accumulatedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
-                  </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Итого после %</span>
-                                <span className={`font-bold ${stockData.overallProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                <span className={themeClasses.text.secondary}>Накоплено по открытым</span>
+                                <span className="text-red-500 dark:text-red-400">-{stockData.accumulatedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                              </div>
+                              <div className={`flex justify-between text-sm pt-2 border-t ${themeClasses.border.primary}`}>
+                                <span className={`${themeClasses.text.primary} font-medium`}>Итого после %</span>
+                                <span className={`font-bold ${stockData.overallProfitAfterInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                   {stockData.overallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                                 </span>
-                    </div>
-                  </div>
-                      </div>
-                    </div>
-                      </div>
-
-                      <div className="bg-white p-6 rounded-lg border border-gray-200">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Детали по {selectedStock}</h3>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+              
+                      <Card>
+                        <h3 className={`text-lg font-medium ${themeClasses.text.primary} mb-4`}>Детали по {selectedStock}</h3>
                         <div className="space-y-4">
                           {/* Price info */}
                           <div>
                             <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Средняя цена входа</span>
-                              <span className="font-medium">{stockData.avgEntryPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
-                    </div>
+                              <span className={themeClasses.text.secondary}>Средняя цена входа</span>
+                              <span className={`font-medium ${themeClasses.text.primary}`}>{stockData.avgEntryPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
+                            </div>
                             <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Текущая цена</span>
-                              <span className="font-medium">
+                              <span className={themeClasses.text.secondary}>Текущая цена</span>
+                              <span className={`font-medium ${themeClasses.text.primary}`}>
                                 {stockData.currentPrice > 0 ? stockData.currentPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 }) : '—'}
                               </span>
-                </div>
+                            </div>
                             <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Текущая стоимость</span>
-                              <span className="font-medium">{stockData.currentValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
-              </div>
-            </div>
+                              <span className={themeClasses.text.secondary}>Текущая стоимость</span>
+                              <span className={`font-medium ${themeClasses.text.primary}`}>{stockData.currentValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
+                            </div>
+                          </div>
                           
                           {/* Trading activity */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Сделки:</div>
+                          <div className={`border-t ${themeClasses.border.primary} pt-4`}>
+                            <div className={`text-sm font-medium ${themeClasses.text.primary} mb-3`}>Сделки:</div>
                             <div className="space-y-2">
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Открытые</span>
-                                <span className="font-medium">{stockData.openTrades}</span>
-                </div>
+                                <span className={themeClasses.text.secondary}>Открытые</span>
+                                <span className={`font-medium ${themeClasses.text.primary}`}>{stockData.openTrades}</span>
+                              </div>
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Закрытые</span>
-                                <span className="font-medium">{stockData.closedTrades}</span>
+                                <span className={themeClasses.text.secondary}>Закрытые</span>
+                                <span className={`font-medium ${themeClasses.text.primary}`}>{stockData.closedTrades}</span>
+                              </div>
+                              <div className={`flex justify-between text-sm pt-2 border-t ${themeClasses.border.primary}`}>
+                                <span className={`${themeClasses.text.primary} font-medium`}>Всего</span>
+                                <span className={`font-bold ${themeClasses.text.primary}`}>{stockData.totalTrades}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
                     </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Всего</span>
-                                <span className="font-bold">{stockData.totalTrades}</span>
                   </div>
-                    </div>
-                  </div>
-                    </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
               
               {/* Stock-specific charts */}
               <div className="space-y-6 mt-8">
@@ -1782,7 +1788,7 @@ function Statistics() {
                       data={prepareStockMonthlyProfitData(selectedStock)}
                       options={getChartOptions()}
                     />
-                  </div>
+                    </div>
                 </Card>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1824,14 +1830,14 @@ function Statistics() {
                       />
                     </div>
                   </Card>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
 
         {/* Charts for all stocks */}
-        {selectedStock === 'all' && (
+      {selectedStock === 'all' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Monthly Profit Chart */}
             <Card>
@@ -1952,20 +1958,20 @@ function Statistics() {
                     </label>
                   ))}
                 </div>
-              </div>
+                </div>
             </div>
             
             <div className="flex justify-end gap-3">
-              <Button
+                <Button 
                 variant="secondary"
-                size="sm"
+                  size="sm" 
                 onClick={() => {
                   setShowPDFOptions(false);
                   setSelectedStocksForPDF([]);
                 }}
-              >
+                >
                 Отмена
-              </Button>
+                </Button>
               <Button
                 variant="primary"
                 size="sm"
@@ -1978,7 +1984,7 @@ function Statistics() {
               >
                 Создать отчет
               </Button>
-            </div>
+              </div>
           </Card>
         </div>
       )}

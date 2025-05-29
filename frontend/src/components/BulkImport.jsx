@@ -23,7 +23,7 @@ function BulkImport() {
     setFileName(file.name);
     setError('');
     setSuccess('');
-
+    
     Papa.parse(file, {
       complete: (results) => {
         console.log('Parsed CSV data:', results);
@@ -166,7 +166,7 @@ function BulkImport() {
       });
 
       console.log('Отправляем сделки:', trades);
-
+          
       // Отправляем данные на сервер
       const response = await axios.post('/api/trades/bulk-import', { trades });
       
@@ -257,7 +257,7 @@ function BulkImport() {
             )}
           </div>
         </Card>
-
+        
         {/* Превью данных */}
         {previewData.length > 0 && (
           <Card className="mb-6">
@@ -311,10 +311,10 @@ function BulkImport() {
           <Card variant="default" className="mb-6 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30">
             <div className="text-green-700 dark:text-green-300 text-sm">
               {success}
-            </div>
+          </div>
           </Card>
         )}
-
+        
         {/* Кнопки действий */}
         <div className="flex gap-4">
           <Button

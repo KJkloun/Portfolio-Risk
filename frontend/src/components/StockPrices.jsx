@@ -224,34 +224,37 @@ function StockPrices() {
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div className="flex gap-3 items-center">
-            <button 
-              onClick={resetStockPrices}
-              className="px-3 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-400"
-            >
-              Сбросить курсы
-            </button>
-            <button 
-              onClick={initializeDefaultPrices}
-              className="px-3 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-400"
-            >
-              Инициализировать
-            </button>
-            <div className="relative w-full sm:w-64">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <input
-                type="text"
-                placeholder="Поиск акций..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-              />
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={resetStockPrices}
+          >
+            Сбросить курсы
+          </Button>
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={initializeDefaultPrices}
+          >
+            Инициализировать
+          </Button>
+          <div className="relative w-full sm:w-64">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className={`h-4 w-4 ${themeClasses.text.tertiary}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+              </svg>
             </div>
+              <Input
+              type="text"
+              placeholder="Поиск акций..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+                size="sm"
+                className="pl-9"
+            />
           </div>
         </div>
+      </div>
 
         {filteredStocks.length === 0 ? (
           <Card className="text-center py-8">
@@ -288,8 +291,8 @@ function StockPrices() {
                   >
                     Инициализировать все курсы
                   </Button>
-                </div>
-              </div>
+        </div>
+        </div>
             </Card>
 
             {/* Список акций */}
@@ -312,43 +315,43 @@ function StockPrices() {
                               })}
                             </Badge>
                           )}
-                        </div>
+                    </div>
                         <p className={`text-sm ${themeClasses.text.secondary}`}>
                           Открытых позиций: {stock.openPositions}
                         </p>
-                      </div>
+                    </div>
                     </div>
 
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                         <Input
-                          type="number"
-                          step="0.01"
+                        type="number"
+                        step="0.01"
                           placeholder="Новая цена"
-                          value={stockPrices[stock.symbol] || ''}
-                          onChange={(e) => updateStockPrice(stock.symbol, e.target.value)}
+                        value={stockPrices[stock.symbol] || ''}
+                        onChange={(e) => updateStockPrice(stock.symbol, e.target.value)}
                           size="sm"
                           className="w-32"
-                        />
+                      />
                         <span className={`text-sm ${themeClasses.text.tertiary}`}>₽</span>
-                      </div>
+                    </div>
 
                       <div className="flex gap-2">
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => saveAsLastPrice(stock)}
-                          disabled={savingStock === stock.symbol || !stockPrices[stock.symbol]}
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => saveAsLastPrice(stock)}
+                        disabled={savingStock === stock.symbol || !stockPrices[stock.symbol]}
                           loading={savingStock === stock.symbol}
-                        >
-                          {savingStock === stock.symbol ? (
-                            <span className="flex items-center">
+                      >
+                        {savingStock === stock.symbol ? (
+                          <span className="flex items-center">
                               <span className="w-3 h-3 mr-2 rounded-full border-2 border-t-transparent border-white animate-spin"></span>
-                              Сохранение...
-                            </span>
-                          ) : (
-                            'Сохранить'
-                          )}
+                            Сохранение...
+                          </span>
+                        ) : (
+                          'Сохранить'
+                        )}
                         </Button>
 
                         {stock.openPositions > 0 && (
@@ -360,8 +363,8 @@ function StockPrices() {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                          </Button>
-                        )}
+                      </Button>
+                    )}
                       </div>
                     </div>
                   </div>
