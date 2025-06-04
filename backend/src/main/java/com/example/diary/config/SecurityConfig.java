@@ -40,6 +40,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/h2-console/**").permitAll()
                 .requestMatchers("/api/actuator/**").permitAll()
+                .requestMatchers("/api/swagger-ui/**").permitAll()
+                .requestMatchers("/api/v3/api-docs/**").permitAll()
+                .requestMatchers("/api/swagger-ui.html").permitAll()
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session
