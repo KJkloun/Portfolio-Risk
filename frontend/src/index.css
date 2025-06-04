@@ -18,7 +18,7 @@
   }
   
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-gray-50 text-gray-900 dark:bg-dark-900 dark:text-gray-100 transition-colors duration-300;
   }
 
   /* Шрифт Inter для банковского стиля */
@@ -32,66 +32,73 @@
 }
 
 @layer components {
-  /* Карточки в стиле банковских интерфейсов */
+  /* Банковские карточки */
   .bank-card {
-    @apply bg-white rounded-2xl shadow-card transition-all duration-300 p-6 border border-gray-100 hover:shadow-card-hover;
+    @apply bg-white dark:bg-dark-800 rounded-2xl shadow-card dark:shadow-card-dark border border-gray-100 dark:border-dark-700 transition-all duration-300 hover:shadow-card-hover dark:hover:shadow-card-hover-dark;
   }
 
-  /* Кнопки в стиле банковских приложений */
-  .btn {
-    @apply px-5 py-3 rounded-xl font-medium transition-all duration-200 shadow-button inline-flex items-center justify-center;
-  }
-  
-  .btn-primary {
-    @apply bg-brand-blue-500 text-white hover:bg-brand-blue-600 active:bg-brand-blue-700 focus:ring-2 focus:ring-brand-blue-300 focus:outline-none;
-  }
-  
-  .btn-secondary {
-    @apply bg-brand-green-500 text-white hover:bg-brand-green-600 active:bg-brand-green-700 focus:ring-2 focus:ring-brand-green-300 focus:outline-none;
+  .bank-card-header {
+    @apply p-6 border-b border-gray-100 dark:border-dark-700;
   }
 
-  .btn-accent {
-    @apply bg-brand-yellow-500 text-gray-900 hover:bg-brand-yellow-400 active:bg-brand-yellow-600 focus:ring-2 focus:ring-brand-yellow-300 focus:outline-none;
+  .bank-card-body {
+    @apply p-6;
   }
 
-  .btn-outline {
-    @apply border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100 focus:ring-2 focus:ring-gray-200 focus:outline-none;
+  /* Банковские кнопки */
+  .bank-button {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-button transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-dark-900;
   }
 
-  .btn-danger {
-    @apply bg-brand-red-500 text-white hover:bg-brand-red-600 active:bg-brand-red-700 focus:ring-2 focus:ring-brand-red-300 focus:outline-none;
+  .bank-button-primary {
+    @apply bank-button bg-brand-blue-500 text-white hover:bg-brand-blue-600 focus:ring-brand-blue-500 active:bg-brand-blue-700;
   }
 
-  /* Small button variant for consistent sizing */
-  .btn-sm {
-    @apply py-1 px-3 text-sm;
+  .bank-button-secondary {
+    @apply bank-button bg-gray-100 dark:bg-dark-700 text-gray-900 dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-dark-600 focus:ring-gray-500;
   }
 
-  /* Инпуты в стиле банковских приложений */
-  .input {
-    @apply w-full rounded-xl border-gray-300 shadow-sm focus:border-brand-blue-400 focus:ring focus:ring-brand-blue-200 focus:ring-opacity-50 transition-colors duration-200;
+  .bank-button-success {
+    @apply bank-button bg-brand-green-500 text-white hover:bg-brand-green-600 focus:ring-brand-green-500;
   }
 
-  /* Стилизация таблиц */
+  .bank-button-danger {
+    @apply bank-button bg-brand-red-500 text-white hover:bg-brand-red-600 focus:ring-brand-red-500;
+  }
+
+  /* Банковские формы */
+  .bank-input {
+    @apply block w-full px-3 py-2 border border-gray-300 dark:border-dark-600 rounded-lg shadow-sm bg-white dark:bg-dark-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 transition-colors duration-200;
+  }
+
+  .bank-select {
+    @apply bank-input pr-10 cursor-pointer;
+  }
+
+  .bank-textarea {
+    @apply bank-input resize-none;
+  }
+
+  /* Банковские таблицы */
   .bank-table {
-    @apply w-full border-collapse table-fixed;
+    @apply w-full bg-white dark:bg-dark-800 rounded-2xl shadow-card dark:shadow-card-dark overflow-hidden border border-gray-100 dark:border-dark-700;
   }
 
   .bank-table th {
-    @apply text-left text-sm uppercase tracking-wider py-4 px-4 bg-gradient-to-b from-gray-50 to-gray-100 text-gray-600 font-medium border-b border-gray-200 whitespace-nowrap transition-colors duration-150 first:rounded-tl-xl last:rounded-tr-xl;
+    @apply text-left text-sm uppercase tracking-wider py-4 px-4 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-dark-700 dark:to-dark-800 text-gray-600 dark:text-gray-300 font-medium border-b border-gray-200 dark:border-dark-600 whitespace-nowrap transition-colors duration-150 first:rounded-tl-xl last:rounded-tr-xl;
   }
 
   .bank-table td {
-    @apply py-4 px-4 border-b border-gray-100 transition-colors duration-150;
+    @apply py-4 px-4 border-b border-gray-100 dark:border-dark-700 transition-colors duration-150;
   }
 
   .bank-table tr:hover td {
-    @apply bg-blue-50/50;
+    @apply bg-blue-50/50 dark:bg-dark-700/50;
   }
   
   /* Добавляем стили для заголовка при наведении */
   .bank-table th.cursor-pointer:hover {
-    @apply bg-gradient-to-b from-gray-100 to-gray-200 text-gray-800;
+    @apply bg-gradient-to-b from-gray-100 to-gray-200 dark:from-dark-600 dark:to-dark-700 text-gray-800 dark:text-gray-200;
   }
 
   /* Бейджи и статусы */
@@ -100,18 +107,88 @@
   }
 
   .badge-success {
-    @apply bg-brand-green-100 text-brand-green-800;
+    @apply bg-brand-green-100 dark:bg-brand-green-900/30 text-brand-green-800 dark:text-brand-green-300;
   }
 
   .badge-danger {
-    @apply bg-brand-red-100 text-brand-red-800;
+    @apply bg-brand-red-100 dark:bg-brand-red-900/30 text-brand-red-800 dark:text-brand-red-300;
   }
 
   .badge-warning {
-    @apply bg-brand-yellow-100 text-brand-yellow-800;
+    @apply bg-brand-yellow-100 dark:bg-brand-yellow-900/30 text-brand-yellow-800 dark:text-brand-yellow-300;
   }
 
   .badge-info {
-    @apply bg-brand-blue-100 text-brand-blue-800;
+    @apply bg-brand-blue-100 dark:bg-brand-blue-900/30 text-brand-blue-800 dark:text-brand-blue-300;
+  }
+
+  /* Навигация */
+  .nav-link {
+    @apply text-gray-600 dark:text-gray-300 hover:text-brand-blue-500 dark:hover:text-brand-blue-400 transition-colors duration-200;
+  }
+
+  .nav-link-active {
+    @apply text-brand-blue-500 dark:text-brand-blue-400 font-medium;
+  }
+
+  /* Модальные окна */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 transition-opacity duration-300;
+  }
+
+  .modal-content {
+    @apply bg-white dark:bg-dark-800 rounded-2xl shadow-xl border border-gray-200 dark:border-dark-700 transform transition-all duration-300;
+  }
+
+  /* Уведомления */
+  .notification {
+    @apply p-4 rounded-lg border transition-all duration-300;
+  }
+
+  .notification-success {
+    @apply notification bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200;
+  }
+
+  .notification-error {
+    @apply notification bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200;
+  }
+
+  .notification-warning {
+    @apply notification bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200;
+  }
+
+  .notification-info {
+    @apply notification bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200;
+  }
+
+  /* Анимации */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+
+  /* Скроллбар для темной темы */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .dark ::-webkit-scrollbar-track {
+    @apply bg-dark-800;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-dark-600 rounded-full;
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    @apply bg-dark-500;
   }
 }
