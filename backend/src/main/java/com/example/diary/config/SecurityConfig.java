@@ -37,19 +37,11 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/h2-console/**").permitAll()
-                .requestMatchers("/api/actuator/**").permitAll()
-                .requestMatchers("/api/swagger-ui/**").permitAll()
-                .requestMatchers("/api/v3/api-docs/**").permitAll()
-                .requestMatchers("/api/swagger-ui.html").permitAll()
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()  // Временно разрешаем все запросы для демонстрации
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            );
             
         // Для H2 консоли
         http.headers(headers -> headers.frameOptions().disable());
