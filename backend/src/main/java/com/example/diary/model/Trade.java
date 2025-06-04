@@ -129,7 +129,11 @@ public class Trade {
         if (entryDate == null || exitDate == null || getDailyInterestAmount() == null) return result;
 
         LocalDate currentDate = entryDate;
-        while (!currentDate.isAfter(exitDate)) {
+        // Interest accrues for each day the position is held. Since
+        // ChronoUnit.DAYS.between(entryDate, exitDate) in getTotalInterest()
+        // excludes the exit date, we iterate until the day before exitDate to
+        // keep calculations consistent.
+        while (currentDate.isBefore(exitDate)) {
             DailyInterest daily = new DailyInterest();
             daily.setDate(currentDate);
             daily.setAmount(getDailyInterestAmount());
