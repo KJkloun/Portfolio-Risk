@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 import axios from 'axios'
+import './i18n'
 
 // Настройка axios для работы с API бэкенда
 axios.defaults.baseURL = 'http://localhost:8081';

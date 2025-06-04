@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
 
 function BulkImport() {
+  const { t } = useTranslation();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -32,19 +34,19 @@ function BulkImport() {
         setPreview(previewData);
       } catch (err) {
         console.error("File reading error:", err);
-        setError('Ошибка при чтении файла. Убедитесь, что файл имеет правильный формат.');
+        setError(t('import.error', 'Ошибка при чтении файла. Убедитесь, что файл имеет правильный формат.'));
       }
     };
     reader.onerror = (err) => {
       console.error("FileReader error:", err);
-      setError('Ошибка при чтении файла.');
+      setError(t('import.error', 'Ошибка при чтении файла.'));
     };
     reader.readAsBinaryString(selectedFile);
   };
 
   const handleUpload = async () => {
     if (!file) {
-      setError('Пожалуйста, выберите файл для импорта');
+      setError(t('import.selectFileError', 'Пожалуйста, выберите файл для импорта'));
       return;
     }
 
@@ -67,23 +69,23 @@ function BulkImport() {
           // Send data to server
           const response = await axios.post('/api/trades/bulk-import', { trades: jsonData });
           console.log("Server response:", response.data);
-          setSuccess(`${response.data.importedCount} сделок успешно импортировано`);
+          setSuccess(t('import.successMessage', `${response.data.importedCount} сделок успешно импортировано`));
           setFile(null);
           setPreview([]);
           document.getElementById('file-upload').value = '';
         } catch (err) {
           console.error("File processing error:", err);
-          setError('Ошибка при обработке файла. Убедитесь, что файл имеет правильный формат.');
+          setError(t('import.processingError', 'Ошибка при обработке файла. Убедитесь, что файл имеет правильный формат.'));
         }
       };
       reader.onerror = (err) => {
         console.error("FileReader error:", err);
-        setError('Ошибка при чтении файла.');
+        setError(t('import.error', 'Ошибка при чтении файла.'));
       };
       reader.readAsBinaryString(file);
     } catch (err) {
       console.error("Upload error:", err);
-      const errorMessage = err.response?.data?.message || 'Не удалось импортировать сделки';
+      const errorMessage = err.response?.data?.message || t('import.uploadError', 'Не удалось импортировать сделки');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -119,157 +121,139 @@ function BulkImport() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 transition-colors duration-300">
       <div className="p-6 max-w-4xl mx-auto">
-        <h1 className="text-2xl font-medium text-gray-900 mb-8">Массовый импорт сделок</h1>
+        <h1 className="text-2xl font-medium text-gray-900 dark:text-gray-100 mb-8">
+          {t('import.title', 'Массовый импорт сделок')}
+        </h1>
         
-        {/* File Upload Card */}
-        <div className="bg-white rounded-lg p-6 border border-gray-200 mb-6">
-          <div className="mb-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-3">Выберите файл для импорта</h2>
-            <div 
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:bg-gray-50 transition-colors cursor-pointer"
-              onClick={() => document.getElementById('file-upload').click()}
-            >
-              <div className="flex flex-col items-center justify-center">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <span className="mt-2 block text-sm font-medium text-gray-700">
-                  {file ? file.name : 'Нажмите для выбора файла'}
-                </span>
-                <span className="mt-1 block text-xs text-gray-500">
-                  Поддерживаемые форматы: XLSX, XLS, CSV
-                </span>
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </div>
-            </div>
+        {/* Success message */}
+        {success && (
+          <div className="notification-success mb-6">
+            {success}
           </div>
-          
-          {preview.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-md font-medium text-gray-900 mb-3">Предпросмотр данных:</h3>
-              <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {preview.map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {row.map((cell, cellIndex) => (
-                          <td key={cellIndex} className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
-                            {cell}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Показаны первые {preview.length} строк из файла</p>
-            </div>
-          )}
-          
-          <div className="flex flex-col sm:flex-row gap-3 justify-between items-center">
-            <button 
-              onClick={downloadTemplate}
-              className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-400"
-            >
-              Скачать шаблон
-            </button>
-            
-            <button
-              onClick={handleUpload}
-              disabled={loading || !file}
-              className={`w-full sm:w-auto py-2 px-6 rounded-md text-sm font-medium ${
-                loading || !file
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-700 text-white hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400'
-              }`}
-            >
-              {loading ? 'Импорт...' : 'Импортировать сделки'}
-            </button>
-          </div>
-        </div>
-        
-        {/* Instructions Card */}
-        <div className="bg-white rounded-lg p-6 border border-gray-200 mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Инструкция</h2>
-          <p className="text-sm text-gray-600 mb-4">
-            Для импорта сделок загрузите файл Excel (.xlsx) или CSV в указанном формате. 
-            Файл должен содержать следующие столбцы:
-          </p>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Столбец</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Описание</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Обязательный</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <tr>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">symbol</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Тикер акции</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600">Да</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">entryPrice</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Цена входа</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600">Да</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">quantity</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Количество</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600">Да</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">entryDate</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Дата входа в формате ГГГГ-ММ-ДД</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600">Да</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">marginAmount</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Процентная ставка</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600">Да</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">notes</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Заметки</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Нет</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">exitDate</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Дата выхода в формате ГГГГ-ММ-ДД (для закрытых сделок)</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Нет</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">exitPrice</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Цена выхода (для закрытых сделок)</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Нет</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        
-        {/* Messages */}
+        )}
+
+        {/* Error message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+          <div className="notification-error mb-6">
             {error}
           </div>
         )}
         
-        {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4 text-sm">
-            {success}
+        {/* File Upload Card */}
+        <div className="bank-card mb-6">
+          <div className="bank-card-body">
+            <div className="mb-6">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-3">
+                {t('import.selectFile', 'Выберите файл для импорта')}
+              </h2>
+              <div 
+                className="border-2 border-dashed border-gray-300 dark:border-dark-600 rounded-lg p-8 text-center hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors cursor-pointer"
+                onClick={() => document.getElementById('file-upload').click()}
+              >
+                <div className="flex flex-col items-center justify-center">
+                  <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <span className="mt-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {file ? file.name : t('import.clickToSelect', 'Нажмите для выбора файла')}
+                  </span>
+                  <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                    {t('import.supportedFormats', 'Поддерживаемые форматы: XLSX, XLS, CSV')}
+                  </span>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            {preview.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-3">
+                  {t('import.preview', 'Предпросмотр данных')}:
+                </h3>
+                <div className="overflow-x-auto border border-gray-200 dark:border-dark-600 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-600">
+                    <tbody className="bg-white dark:bg-dark-800 divide-y divide-gray-200 dark:divide-dark-600">
+                      {preview.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="px-3 py-2 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  {t('import.previewNote', `Показаны первые ${preview.length} строк из файла`)}
+                </p>
+              </div>
+            )}
+            
+            <div className="flex flex-col sm:flex-row gap-3 justify-between items-center">
+              <button 
+                onClick={downloadTemplate}
+                className="bank-button-secondary"
+              >
+                {t('import.downloadTemplate', 'Скачать шаблон')}
+              </button>
+              
+              <button
+                onClick={handleUpload}
+                disabled={loading || !file}
+                className={`bank-button-primary ${
+                  loading || !file
+                    ? 'opacity-50 cursor-not-allowed'
+                    : ''
+                }`}
+              >
+                {loading ? t('import.processing', 'Импорт...') : t('import.uploadFile', 'Импортировать сделки')}
+              </button>
+            </div>
           </div>
-        )}
+        </div>
+        
+        {/* Instructions Card */}
+        <div className="bank-card mb-6">
+          <div className="bank-card-body">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+              {t('import.instructions', 'Инструкции по импорту')}
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-2">
+                  {t('import.fileFormat', 'Формат файла')}:
+                </h3>
+                <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                  <li>{t('import.formatNote1', 'Файл должен содержать следующие колонки: symbol, entryPrice, quantity, entryDate, marginAmount, notes, exitDate, exitPrice')}</li>
+                  <li>{t('import.formatNote2', 'Обязательные поля: symbol, entryPrice, quantity, entryDate, marginAmount')}</li>
+                  <li>{t('import.formatNote3', 'Даты должны быть в формате YYYY-MM-DD (например: 2023-05-15)')}</li>
+                  <li>{t('import.formatNote4', 'Цены и количество должны быть числовыми значениями')}</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-md font-medium text-gray-800 dark:text-gray-200 mb-2">
+                  {t('import.tips', 'Рекомендации')}:
+                </h3>
+                <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                  <li>{t('import.tip1', 'Скачайте шаблон и используйте его как основу для ваших данных')}</li>
+                  <li>{t('import.tip2', 'Убедитесь, что все обязательные поля заполнены')}</li>
+                  <li>{t('import.tip3', 'Для открытых позиций оставьте поля exitDate и exitPrice пустыми')}</li>
+                  <li>{t('import.tip4', 'Система автоматически пропустит строки с некорректными данными')}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

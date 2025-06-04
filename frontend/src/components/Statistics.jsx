@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -43,6 +44,7 @@ ChartJS.register(
 );
 
 function Statistics() {
+  const { t } = useTranslation();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -164,11 +166,11 @@ function Statistics() {
       } else {
         console.error('Statistics API returned non-array data:', response.data);
         setTrades([]);
-        setError('Данные получены в неверном формате. Пожалуйста, обратитесь к администратору.');
+        setError(t('errors.serverError', 'Данные получены в неверном формате. Пожалуйста, обратитесь к администратору.'));
       }
     } catch (err) {
       console.error('Error loading statistics:', err);
-      setError('Не удалось загрузить данные. Пожалуйста, попробуйте позже.');
+      setError(t('errors.networkError', 'Не удалось загрузить данные. Пожалуйста, попробуйте позже.'));
       setTrades([]);
     } finally {
       setLoading(false);
@@ -1288,20 +1290,24 @@ function Statistics() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-600 border-r-2 border-b-2 border-transparent"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 transition-colors duration-300">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-brand-blue-500 border-r-2 border-b-2 border-transparent"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 transition-colors duration-300">
       <div className="p-6 max-w-6xl mx-auto">
-        <h1 className="text-2xl font-medium text-gray-900 mb-8">Статистика торговли</h1>
+        <h1 className="text-2xl font-medium text-gray-900 dark:text-gray-100 mb-8">
+          {t('statistics.title', 'Статистика торговли')}
+        </h1>
 
         {/* Error message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          <div className="notification-error mb-6">
             {error}
           </div>
         )}
@@ -1309,16 +1315,16 @@ function Statistics() {
         {/* Stock Filter */}
         <div className="flex items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <label htmlFor="stockFilter" className="text-sm text-gray-600">
-              Акция:
+            <label htmlFor="stockFilter" className="text-sm text-gray-600 dark:text-gray-400">
+              {t('statistics.selectStock', 'Акция')}:
             </label>
             <select
               id="stockFilter"
               value={selectedStock}
               onChange={(e) => handleStockChange(e.target.value)}
-              className="rounded-md border-gray-300 text-sm bg-white focus:border-gray-400 focus:ring-0"
+              className="bank-select"
             >
-              <option value="all">Все акции</option>
+              <option value="all">{t('common.all', 'Все акции')}</option>
               {availableStocks.map(symbol => (
                 <option key={symbol} value={symbol}>{symbol}</option>
               ))}
@@ -1328,16 +1334,16 @@ function Statistics() {
           <div className="flex">
             <button
               onClick={() => generatePDFReport()}
-              className="px-4 py-2 text-sm text-white bg-gray-700 border border-gray-700 rounded-l-md hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center gap-2"
+              className="bank-button-primary rounded-r-none border-r border-brand-blue-600 flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              PDF отчет
+              {t('statistics.pdfReport', 'PDF отчет')}
             </button>
             <button
               onClick={() => setShowPDFOptions(true)}
-              className="px-2 py-2 text-sm text-white bg-gray-700 border border-l-gray-600 border-gray-700 rounded-r-md hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400"
+              className="bank-button-primary rounded-l-none border-l-0 px-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1348,16 +1354,20 @@ function Statistics() {
 
         {/* Saved stock prices info */}
         {Object.keys(stockPrices).length > 0 && (
-          <div className="mb-8 p-4 bg-white border border-gray-200 rounded-lg text-sm">
-            <div className="font-medium text-gray-700 mb-2">Текущие курсы акций:</div>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(stockPrices)
-                .filter(([_, price]) => price && !isNaN(parseFloat(price)))
-                .map(([symbol, price]) => (
-                  <span key={symbol} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                    {symbol}: {parseFloat(price).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
-                  </span>
-                ))}
+          <div className="bank-card mb-8">
+            <div className="bank-card-body">
+              <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('statistics.currentPrices', 'Текущие курсы акций')}:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(stockPrices)
+                  .filter(([_, price]) => price && !isNaN(parseFloat(price)))
+                  .map(([symbol, price]) => (
+                    <span key={symbol} className="badge badge-info">
+                      {symbol}: {parseFloat(price).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
+                    </span>
+                  ))}
+              </div>
             </div>
           </div>
         )}
@@ -1369,110 +1379,158 @@ function Statistics() {
             <div>
               {/* Detailed stats */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Сводка портфеля</h3>
-                  <div className="space-y-4">
-                    {/* Basic portfolio info */}
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Стоимость позиций</span>
-                        <span className="font-medium">{stats.totalCostOpen.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
-                      </div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Активных акций</span>
-                        <span className="font-medium">{stats.totalSharesOpen}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Средняя ставка</span>
-                        <span className="font-medium">{stats.avgCreditRate.toFixed(2)}%</span>
-                      </div>
-                    </div>
-                    
-                    {/* Profit breakdown */}
-                    <div className="border-t border-gray-100 pt-4">
-                      <div className="text-sm font-medium text-gray-700 mb-3">Прибыль:</div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Зафиксированная</span>
-                          <span className={stats.totalProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                            {stats.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                <div className="bank-card">
+                  <div className="bank-card-body">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                      {t('statistics.portfolioSummary', 'Сводка портфеля')}
+                    </h3>
+                    <div className="space-y-4">
+                      {/* Basic portfolio info */}
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.positionValue', 'Стоимость позиций')}
+                          </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            {stats.totalCostOpen.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                           </span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Потенциальная</span>
-                          <span className={stats.potentialProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                            {stats.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.activeShares', 'Активных акций')}
                           </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.totalSharesOpen}</span>
                         </div>
-                        <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                          <span className="text-gray-700 font-medium">Общая</span>
-                          <span className={`font-bold ${stats.totalOverallProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {stats.totalOverallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.averageRate', 'Средняя ставка')}
                           </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.avgCreditRate.toFixed(2)}%</span>
                         </div>
                       </div>
-                    </div>
-                    
-                    {/* Interest costs */}
-                    <div className="border-t border-gray-100 pt-4">
-                      <div className="text-sm font-medium text-gray-700 mb-3">Проценты:</div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Заплачено по закрытым</span>
-                          <span className="text-red-600 font-medium">-{stats.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                      
+                      {/* Profit breakdown */}
+                      <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                          {t('trades.profit', 'Прибыль')}:
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Накоплено по открытым</span>
-                          <span className="text-red-500">-{stats.totalAccruedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.realizedProfit', 'Зафиксированная')}
+                            </span>
+                            <span className={`font-medium ${stats.totalProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {stats.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.potentialProfit', 'Потенциальная')}
+                            </span>
+                            <span className={`font-medium ${stats.potentialProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {stats.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                            <span className="text-gray-700 dark:text-gray-300 font-medium">
+                              {t('statistics.totalProfit', 'Общая')}
+                            </span>
+                            <span className={`font-bold ${stats.totalOverallProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {stats.totalOverallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                          <span className="text-gray-700 font-medium">Итого после %</span>
-                          <span className={`font-bold ${stats.totalOverallProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {stats.totalOverallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                          </span>
+                      </div>
+                      
+                      {/* Interest costs */}
+                      <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                          {t('statistics.interests', 'Проценты')}:
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.paidOnClosed', 'Заплачено по закрытым')}
+                            </span>
+                            <span className="text-red-600 dark:text-red-400 font-medium">
+                              -{stats.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.accruedOnOpen', 'Накоплено по открытым')}
+                            </span>
+                            <span className="text-red-500 dark:text-red-400">
+                              -{stats.totalAccruedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                            <span className="text-gray-700 dark:text-gray-300 font-medium">
+                              {t('statistics.totalAfterInterest', 'Итого после %')}
+                            </span>
+                            <span className={`font-bold ${stats.totalOverallProfitAfterInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {stats.totalOverallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Активность</h3>
-                  <div className="space-y-4">
-                    {/* Trade summary */}
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Открытые сделки</span>
-                        <span className="font-medium">{stats.totalTradesOpen}</span>
-                      </div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Закрытые сделки</span>
-                        <span className="font-medium">{stats.totalTradesClosed}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Всего сделок</span>
-                        <span className="font-medium">{stats.totalTradesOpen + stats.totalTradesClosed}</span>
-                      </div>
-                    </div>
-
-                    {/* Performance metrics */}
-                    <div className="border-t border-gray-100 pt-4">
-                      <div className="text-sm font-medium text-gray-700 mb-3">Эффективность:</div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Успешность</span>
-                          <span className="font-medium">
-                            {stats.totalTradesClosed > 0 ? `${Math.round((stats.totalProfit > 0 ? 1 : 0) * 100)}%` : '—'}
+                <div className="bank-card">
+                  <div className="bank-card-body">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                      {t('statistics.activity', 'Активность')}
+                    </h3>
+                    <div className="space-y-4">
+                      {/* Trade summary */}
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.openTrades', 'Открытые сделки')}
                           </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.totalTradesOpen}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.closedTrades', 'Закрытые сделки')}
+                          </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.totalTradesClosed}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Средняя прибыль/сделка</span>
-                          <span className="font-medium">
-                            {stats.totalTradesClosed > 0 
-                              ? (stats.totalProfit / stats.totalTradesClosed).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
-                              : '—'
-                            }
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.totalTrades', 'Всего сделок')}
                           </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.totalTradesOpen + stats.totalTradesClosed}</span>
+                        </div>
+                      </div>
+
+                      {/* Performance metrics */}
+                      <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                          {t('statistics.performance', 'Эффективность')}:
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.winRate', 'Успешность')}
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                              {stats.totalTradesClosed > 0 ? `${Math.round((stats.totalProfit > 0 ? 1 : 0) * 100)}%` : '—'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.averageProfit', 'Средняя прибыль/сделка')}
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                              {stats.totalTradesClosed > 0 
+                                ? (stats.totalProfit / stats.totalTradesClosed).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
+                                : '—'
+                              }
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1487,8 +1545,12 @@ function Statistics() {
                 const stockData = calculateStockMetrics(selectedStock);
                 
                 if (!stockData) return (
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 text-center">
-                    <p className="text-gray-500">Нет данных для выбранной акции</p>
+                  <div className="bank-card text-center">
+                    <div className="bank-card-body">
+                      <p className="text-gray-500 dark:text-gray-400">
+                        {t('statistics.noData', 'Нет данных для выбранной акции')}
+                      </p>
+                    </div>
                   </div>
                 );
                 
@@ -1496,109 +1558,163 @@ function Statistics() {
                   <div>
                     {/* Detailed stats for specific stock */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="bg-white p-6 rounded-lg border border-gray-200">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Портфель ({selectedStock})</h3>
-                        <div className="space-y-4">
-                          {/* Basic info */}
-                          <div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Стоимость позиций</span>
-                              <span className="font-medium">{stockData.totalInvested.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
-                            </div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Активных акций</span>
-                              <span className="font-medium">{stockData.totalOpenQuantity}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Всего акций</span>
-                              <span className="font-medium">{stockData.totalQuantity}</span>
-                            </div>
-                          </div>
-                          
-                          {/* Profit breakdown */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Прибыль:</div>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Зафиксированная</span>
-                                <span className={stockData.totalProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                  {stockData.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      <div className="bank-card">
+                        <div className="bank-card-body">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                            {t('statistics.portfolio', 'Портфель')} ({selectedStock})
+                          </h3>
+                          <div className="space-y-4">
+                            {/* Basic info */}
+                            <div>
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.positionValue', 'Стоимость позиций')}
+                                </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {stockData.totalInvested.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                                 </span>
                               </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Потенциальная</span>
-                                <span className={stockData.potentialProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                  {stockData.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.activeShares', 'Активных акций')}
                                 </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">{stockData.totalOpenQuantity}</span>
                               </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Общая</span>
-                                <span className={`font-bold ${stockData.overallProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {stockData.overallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.totalShares', 'Всего акций')}
                                 </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">{stockData.totalQuantity}</span>
                               </div>
                             </div>
-                          </div>
-                          
-                          {/* Interest costs */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Проценты:</div>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Заплачено по закрытым</span>
-                                <span className="text-red-600 font-medium">-{stockData.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                            
+                            {/* Profit breakdown */}
+                            <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                {t('trades.profit', 'Прибыль')}:
                               </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Накоплено по открытым</span>
-                                <span className="text-red-500">-{stockData.accumulatedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.realizedProfit', 'Зафиксированная')}
+                                  </span>
+                                  <span className={`font-medium ${stockData.totalProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {stockData.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.potentialProfit', 'Потенциальная')}
+                                  </span>
+                                  <span className={`font-medium ${stockData.potentialProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {stockData.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {t('statistics.totalProfit', 'Общая')}
+                                  </span>
+                                  <span className={`font-bold ${stockData.overallProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {stockData.overallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Итого после %</span>
-                                <span className={`font-bold ${stockData.overallProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {stockData.overallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                                </span>
+                            </div>
+                            
+                            {/* Interest costs */}
+                            <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                {t('statistics.interests', 'Проценты')}:
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.paidOnClosed', 'Заплачено по закрытым')}
+                                  </span>
+                                  <span className="text-red-600 dark:text-red-400 font-medium">
+                                    -{stockData.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.accruedOnOpen', 'Накоплено по открытым')}
+                                  </span>
+                                  <span className="text-red-500 dark:text-red-400">
+                                    -{stockData.accumulatedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {t('statistics.totalAfterInterest', 'Итого после %')}
+                                  </span>
+                                  <span className={`font-bold ${stockData.overallProfitAfterInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {stockData.overallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-white p-6 rounded-lg border border-gray-200">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Детали по {selectedStock}</h3>
-                        <div className="space-y-4">
-                          {/* Price info */}
-                          <div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Средняя цена входа</span>
-                              <span className="font-medium">{stockData.avgEntryPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
-                            </div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Текущая цена</span>
-                              <span className="font-medium">
-                                {stockData.currentPrice > 0 ? stockData.currentPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 }) : '—'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Текущая стоимость</span>
-                              <span className="font-medium">{stockData.currentValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
-                            </div>
-                          </div>
-                          
-                          {/* Trading activity */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Сделки:</div>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Открытые</span>
-                                <span className="font-medium">{stockData.openTrades}</span>
+                      <div className="bank-card">
+                        <div className="bank-card-body">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                            {t('statistics.details', 'Детали')} по {selectedStock}
+                          </h3>
+                          <div className="space-y-4">
+                            {/* Price info */}
+                            <div>
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.averageEntryPrice', 'Средняя цена входа')}
+                                </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {stockData.avgEntryPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.currentPrice', 'Текущая цена')}
+                                </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {stockData.currentPrice > 0 ? stockData.currentPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 }) : '—'}
+                                </span>
                               </div>
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Закрытые</span>
-                                <span className="font-medium">{stockData.closedTrades}</span>
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.currentValue', 'Текущая стоимость')}
+                                </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {stockData.currentValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                </span>
                               </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Всего</span>
-                                <span className="font-bold">{stockData.totalTrades}</span>
+                            </div>
+                            
+                            {/* Trading activity */}
+                            <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                {t('trades.trades', 'Сделки')}:
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.openTrades', 'Открытые')}
+                                  </span>
+                                  <span className="font-medium text-gray-900 dark:text-gray-100">{stockData.openTrades}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.closedTrades', 'Закрытые')}
+                                  </span>
+                                  <span className="font-medium text-gray-900 dark:text-gray-100">{stockData.closedTrades}</span>
+                                </div>
+                                <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {t('statistics.totalTrades', 'Всего')}
+                                  </span>
+                                  <span className="font-bold text-gray-900 dark:text-gray-100">{stockData.totalTrades}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1612,34 +1728,38 @@ function Statistics() {
               {/* Stock-specific charts in minimalistic style */}
               <div className="space-y-6 mt-8">
                 {/* Monthly profit chart */}
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Прибыль по месяцам ({selectedStock})</h3>
-                  <div style={{ height: '300px', width: '100%' }}>
-                    <Bar
-                      data={prepareStockMonthlyProfitData(selectedStock)}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: {
-                            backgroundColor: 'white',
-                            titleColor: '#374151',
-                            bodyColor: '#6b7280',
-                            borderColor: '#d1d5db',
-                            borderWidth: 1,
-                            callbacks: {
-                              label: function(context) {
-                                return `Прибыль: ${new Intl.NumberFormat('ru-RU', {
-                                  style: 'currency',
-                                  currency: 'RUB',
-                                  maximumFractionDigits: 0
-                                }).format(context.parsed.y)}`;
+                <div className="bank-card">
+                  <div className="bank-card-body">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                      {t('statistics.profitByMonth', 'Прибыль по месяцам')} ({selectedStock})
+                    </h3>
+                    <div style={{ height: '300px', width: '100%' }}>
+                      <Bar
+                        data={prepareStockMonthlyProfitData(selectedStock)}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              backgroundColor: 'white',
+                              titleColor: '#374151',
+                              bodyColor: '#6b7280',
+                              borderColor: '#d1d5db',
+                              borderWidth: 1,
+                              callbacks: {
+                                label: function(context) {
+                                  return `Прибыль: ${new Intl.NumberFormat('ru-RU', {
+                                    style: 'currency',
+                                    currency: 'RUB',
+                                    maximumFractionDigits: 0
+                                  }).format(context.parsed.y)}`;
+                                }
                               }
                             }
                           }
-                        },
-                        scales: {
+                        }}
+                        scales={{
                           y: {
                             beginAtZero: true,
                             grid: { color: '#f3f4f6' },
@@ -1658,87 +1778,99 @@ function Statistics() {
                             grid: { display: false },
                             border: { display: false }
                           }
-                        },
-                        elements: { bar: { borderRadius: 2 } }
-                      }}
-                    />
+                        }}
+                        elements={{ bar: { borderRadius: 2 } }}
+                      />
+                    </div>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Status chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Статус позиций</h3>
-                    <div style={{ height: '250px', width: '100%' }}>
-                      <Doughnut
-                        data={prepareStockStatusData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          cutout: '70%',
-                          plugins: {
-                            legend: {
-                              position: 'bottom',
-                              labels: { padding: 20, usePointStyle: true }
+                  <div className="bank-card">
+                    <div className="bank-card-body">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                        {t('statistics.positionStatus', 'Статус позиций')}
+                      </h3>
+                      <div style={{ height: '250px', width: '100%' }}>
+                        <Doughnut
+                          data={prepareStockStatusData(selectedStock)}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '70%',
+                            plugins: {
+                              legend: {
+                                position: 'bottom',
+                                labels: { padding: 20, usePointStyle: true }
+                              }
                             }
-                          }
-                        }}
-                      />
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                   
                   {/* Price ranges chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Диапазоны цен входа</h3>
-                    <div style={{ height: '250px', width: '100%' }}>
-                      <Bar
-                        data={prepareStockEntryPriceData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: { display: false }
-                          },
-                          scales: {
-                            y: {
-                              beginAtZero: true,
-                              grid: { color: '#f3f4f6' },
-                              border: { display: false }
+                  <div className="bank-card">
+                    <div className="bank-card-body">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                        {t('statistics.entryPriceRanges', 'Диапазоны цен входа')}
+                      </h3>
+                      <div style={{ height: '250px', width: '100%' }}>
+                        <Bar
+                          data={prepareStockEntryPriceData(selectedStock)}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false }
                             },
-                            x: {
-                              grid: { display: false },
-                              border: { display: false }
-                            }
-                          },
-                          elements: { bar: { borderRadius: 2 } }
-                        }}
-                      />
+                            scales: {
+                              y: {
+                                beginAtZero: true,
+                                grid: { color: '#f3f4f6' },
+                                border: { display: false }
+                              },
+                              x: {
+                                grid: { display: false },
+                                border: { display: false }
+                              }
+                            },
+                            elements: { bar: { borderRadius: 2 } }
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                   
                   {/* Cumulative profit chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 lg:col-span-2">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Накопленная прибыль ({selectedStock})</h3>
-                    <div style={{ height: '250px', width: '100%' }}>
-                      <Line
-                        data={prepareStockCumulativeProfitData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: { legend: { display: false } },
-                          scales: {
-                            y: {
-                              grid: { color: '#f3f4f6' },
-                              border: { display: false }
+                  <div className="bank-card lg:col-span-2">
+                    <div className="bank-card-body">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                        {t('statistics.cumulativeProfit', 'Накопленная прибыль')} ({selectedStock})
+                      </h3>
+                      <div style={{ height: '250px', width: '100%' }}>
+                        <Line
+                          data={prepareStockCumulativeProfitData(selectedStock)}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                              y: {
+                                grid: { color: '#f3f4f6' },
+                                border: { display: false }
+                              },
+                              x: {
+                                grid: { display: false },
+                                border: { display: false }
+                              }
                             },
-                            x: {
-                              grid: { display: false },
-                              border: { display: false }
-                            }
-                          },
-                          interaction: { intersect: false, mode: 'index' }
-                        }}
-                      />
+                            interaction: { intersect: false, mode: 'index' }
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1751,100 +1883,112 @@ function Statistics() {
         {selectedStock === 'all' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Monthly Profit Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Прибыль по месяцам</h3>
-              {Object.keys(stats.monthlyProfits).length > 0 ? (
-                <div style={{ height: '300px' }}>
-                  <Bar 
-                    data={prepareMonthlyProfitData()} 
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          position: 'top',
-                          labels: { usePointStyle: true, padding: 20 }
-                        }
-                      },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          grid: { color: '#f3f4f6' },
-                          border: { display: false }
+            <div className="bank-card">
+              <div className="bank-card-body">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  {t('statistics.profitByMonth', 'Прибыль по месяцам')}
+                </h3>
+                {Object.keys(stats.monthlyProfits).length > 0 ? (
+                  <div style={{ height: '300px' }}>
+                    <Bar 
+                      data={prepareMonthlyProfitData()} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true, padding: 20 }
+                          }
                         },
-                        x: {
-                          grid: { display: false },
-                          border: { display: false }
-                        }
-                      },
-                      elements: { bar: { borderRadius: 2 } }
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="flex justify-center items-center h-48 text-gray-500">
-                  Нет данных для отображения
-                </div>
-              )}
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            grid: { color: '#f3f4f6' },
+                            border: { display: false }
+                          },
+                          x: {
+                            grid: { display: false },
+                            border: { display: false }
+                          }
+                        },
+                        elements: { bar: { borderRadius: 2 } }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex justify-center items-center h-48 text-gray-500">
+                    {t('statistics.noData', 'Нет данных для отображения')}
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* Daily Profit Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Среднедневная прибыль</h3>
-              {Object.keys(stats.monthlyProfits).length > 0 ? (
-                <div style={{ height: '300px' }}>
-                  <Line
-                    data={prepareDailyProfitData()}
+            <div className="bank-card">
+              <div className="bank-card-body">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  {t('statistics.averageDailyProfit', 'Среднедневная прибыль')}
+                </h3>
+                {Object.keys(stats.monthlyProfits).length > 0 ? (
+                  <div style={{ height: '300px' }}>
+                    <Line
+                      data={prepareDailyProfitData()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            grid: { color: '#f3f4f6' },
+                            border: { display: false }
+                          },
+                          x: {
+                            grid: { display: false },
+                            border: { display: false }
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex justify-center items-center h-48 text-gray-500">
+                    {t('statistics.noData', 'Нет данных для отображения')}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Trade Status Chart */}
+            <div className="bank-card lg:col-span-2">
+              <div className="bank-card-body">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  {t('statistics.positionStatus', 'Статус позиций')}
+                </h3>
+                <div style={{ height: '300px' }} className="flex justify-center">
+                  <Doughnut 
+                    data={{
+                      labels: ['Открытые', 'Закрытые'],
+                      datasets: [{
+                        data: [stats.totalTradesOpen, stats.totalTradesClosed],
+                        backgroundColor: ['#6b7280', '#374151'],
+                        borderWidth: 0
+                      }],
+                    }}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          grid: { color: '#f3f4f6' },
-                          border: { display: false }
-                        },
-                        x: {
-                          grid: { display: false },
-                          border: { display: false }
+                      cutout: '70%',
+                      plugins: {
+                        legend: {
+                          position: 'right',
+                          labels: { usePointStyle: true, padding: 20 }
                         }
                       }
                     }}
                   />
                 </div>
-              ) : (
-                <div className="flex justify-center items-center h-48 text-gray-500">
-                  Нет данных для отображения
-                </div>
-              )}
-            </div>
-            
-            {/* Trade Status Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200 lg:col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Статус позиций</h3>
-              <div style={{ height: '300px' }} className="flex justify-center">
-                <Doughnut 
-                  data={{
-                    labels: ['Открытые', 'Закрытые'],
-                    datasets: [{
-                      data: [stats.totalTradesOpen, stats.totalTradesClosed],
-                      backgroundColor: ['#6b7280', '#374151'],
-                      borderWidth: 0
-                    }],
-                  }}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '70%',
-                    plugins: {
-                      legend: {
-                        position: 'right',
-                        labels: { usePointStyle: true, padding: 20 }
-                      }
-                    }
-                  }}
-                />
               </div>
             </div>
           </div>
@@ -1914,7 +2058,7 @@ function Statistics() {
                 }}
                 className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-400"
               >
-                Отмена
+                {t('common.cancel', 'Отмена')}
               </button>
               <button
                 onClick={() => {
@@ -1925,7 +2069,7 @@ function Statistics() {
                 }}
                 className="px-4 py-2 text-sm text-white bg-gray-700 border border-gray-700 rounded-md hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400"
               >
-                Создать отчет
+                {t('common.create', 'Создать')}
               </button>
             </div>
           </div>

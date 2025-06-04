@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 import { 
   calculateTotalCost, 
   calculateDailyInterestDirect, 
@@ -11,6 +12,7 @@ import {
 import Button from './common/Button';
 
 function TradeList() {
+  const { t } = useTranslation();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,12 +60,12 @@ function TradeList() {
       } else {
         console.error('API returned non-array data:', response.data);
         setTrades([]);
-        setError('Данные получены в неверном формате. Пожалуйста, обратитесь к администратору.');
+        setError(t('errors.networkError', 'Не удалось загрузить сделки'));
       }
       setError('');
     } catch (err) {
       console.error('Error loading trades:', err);
-      setError('Не удалось загрузить сделки. Пожалуйста, попробуйте позже.');
+      setError(t('errors.networkError', 'Не удалось загрузить сделки'));
       setTrades([]);
     } finally {
       setLoading(false);
@@ -311,10 +313,10 @@ function TradeList() {
         const totalInterest = response.data.totalInterest || 0;
         const profit = response.data.profit || 0;
         
-        alert(`Сделка закрыта!\nОбщий процент: ${totalInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}\nПрибыль: ${profit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}`);
+        alert(`${t('trades.tradeClosedMessage', 'Сделка закрыта!')}\n${t('trades.totalInterest', 'Общий процент')}: ${totalInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}\n${t('trades.profit', 'Прибыль')}: ${profit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}`);
       } else {
         console.error('Invalid response format:', response.data);
-        alert('Сделка закрыта, но возникла ошибка при обновлении данных');
+        alert(t('trades.tradeClosedError', 'Сделка закрыта, но возникла ошибка при обновлении данных'));
         loadTrades(); // Перезагрузка данных с сервера
       }
       
@@ -322,12 +324,12 @@ function TradeList() {
       setSellingTrade(null);
     } catch (err) {
       console.error('Error selling trade:', err);
-      setError(err.response?.data?.message || 'Не удалось продать акцию');
+      setError(err.response?.data?.message || t('trades.sellError', 'Не удалось продать акцию'));
     }
   };
 
   const handleDelete = async (tradeId) => {
-    if (window.confirm('Вы уверены, что хотите удалить эту сделку?')) {
+    if (window.confirm(t('trades.deleteConfirm', 'Вы уверены, что хотите удалить эту сделку?'))) {
       try {
         setError('');
         console.log('Deleting trade:', tradeId);
@@ -336,7 +338,7 @@ function TradeList() {
         loadTrades();
       } catch (err) {
         console.error('Error deleting trade:', err);
-        setError(err.response?.data?.message || 'Не удалось удалить сделку');
+        setError(err.response?.data?.message || t('trades.deleteError', 'Не удалось удалить сделку'));
       }
     }
   };
@@ -380,7 +382,7 @@ function TradeList() {
 
     if (selectedIds.length === 0) return;
 
-    if (window.confirm(`Вы уверены, что хотите удалить ${selectedIds.length} выбранных сделок?`)) {
+    if (window.confirm(t('trades.deleteSelectedConfirm', 'Вы уверены, что хотите удалить {count} выбранных сделок?').replace('{count}', selectedIds.length))) {
       setError('');
       try {
         const promises = selectedIds.map(id => axios.delete(`/api/trades/${id}`));
@@ -391,7 +393,7 @@ function TradeList() {
         setSelectAllChecked(false);
       } catch (err) {
         console.error('Error deleting selected trades:', err);
-        setError(err.response?.data?.message || 'Не удалось удалить выбранные сделки');
+        setError(err.response?.data?.message || t('trades.deleteSelectedError', 'Не удалось удалить выбранные сделки'));
       }
     }
   };
@@ -399,138 +401,141 @@ function TradeList() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-600 border-r-2 border-b-2 border-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-600 dark:border-purple-400 border-r-2 border-b-2 border-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 bg-[#f9f9fa] text-gray-900 min-h-screen">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 bg-[#f9f9fa] dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-300">
       {/* Header and Controls */}
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Список сделок</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{t('trades.title', 'Список сделок')}</h1>
         <div className="flex space-x-2">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-gray-400 dark:text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
               </svg>
             </div>
             <input
               type="text"
-              placeholder="Поиск сделок..."
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-64 pl-10 pr-3 py-1.5 border border-gray-300 rounded-md text-gray-900 placeholder-gray-400 focus:ring-purple-500 focus:border-purple-500"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-colors duration-200"
+              placeholder={t('common.searchTrades', 'Поиск сделок...')}
             />
           </div>
-          <button onClick={() => setIsFilterPanelExpanded(!isFilterPanelExpanded)} className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-purple-500">
+          <button 
+            onClick={() => setIsFilterPanelExpanded(!isFilterPanelExpanded)} 
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-purple-500 transition-colors duration-200"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
             </svg>
-            {isFilterPanelExpanded ? 'Скрыть фильтры' : 'Показать фильтры'}
+            {isFilterPanelExpanded ? t('trades.hideFilters', 'Скрыть фильтры') : t('trades.showFilters', 'Показать фильтры')}
           </button>
         </div>
       </div>
 
       {/* Расширенная панель фильтров */}
       {isFilterPanelExpanded && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-4 transition-all duration-300 ease-in-out">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-4 mb-4 transition-all duration-300 ease-in-out">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Первая строка фильтров */}
             {/* Статус сделки */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Статус сделки</label>
-              <div className="flex rounded-md overflow-hidden border border-gray-300">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('trades.status', 'Статус сделки')}</label>
+              <div className="flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-600">
                 <button
                   onClick={() => setView('all')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'all' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 transition-colors duration-200 ${view === 'all' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
                 >
-                  Все
+                  {t('common.all', 'Все')}
                 </button>
                 <button
                   onClick={() => setView('open')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'open' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 transition-colors duration-200 ${view === 'open' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
                 >
-                  Открытые
+                  {t('trades.open', 'Открытые')}
                 </button>
                 <button
                   onClick={() => setView('closed')}
-                  className={`px-4 py-2 text-sm font-medium flex-1 ${view === 'closed' 
+                  className={`px-4 py-2 text-sm font-medium flex-1 transition-colors duration-200 ${view === 'closed' 
                     ? 'bg-purple-500 text-white' 
-                    : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
                 >
-                  Закрытые
+                  {t('trades.closed', 'Закрытые')}
                 </button>
               </div>
             </div>
             
             {/* Фильтр по символу */}
             <div>
-              <label htmlFor="symbolFilter" className="block text-sm font-medium text-gray-700 mb-1">Символ акции</label>
+              <label htmlFor="symbolFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('trades.symbol', 'Символ акции')}</label>
               <input
                 type="text"
                 id="symbolFilter"
                 value={symbolFilter}
                 onChange={(e) => setSymbolFilter(e.target.value)}
-                placeholder="Введите символ"
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                placeholder={t('trades.enterSymbol', 'Введите символ')}
+                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200"
               />
             </div>
             
             {/* Фильтр по прибыльности */}
             <div>
-              <label htmlFor="profitabilityFilter" className="block text-sm font-medium text-gray-700 mb-1">Прибыльность</label>
+              <label htmlFor="profitabilityFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('trades.profitability', 'Прибыльность')}</label>
               <select
                 id="profitabilityFilter"
                 value={profitabilityFilter}
                 onChange={(e) => setProfitabilityFilter(e.target.value)}
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-200"
               >
-                <option value="all">Все сделки</option>
-                <option value="profitable">Прибыльные</option>
-                <option value="unprofitable">Убыточные</option>
+                <option value="all">{t('trades.allTrades', 'Все сделки')}</option>
+                <option value="profitable">{t('trades.profitable', 'Прибыльные')}</option>
+                <option value="unprofitable">{t('trades.unprofitable', 'Убыточные')}</option>
               </select>
             </div>
             
             {/* Вторая строка фильтров */}
             {/* Фильтр по диапазону дат */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Период сделок</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('trades.period', 'Период сделок')}</label>
               <div className="flex space-x-2">
                 <input
                   type="date"
                   value={dateRangeFilter.start}
                   onChange={(e) => setDateRangeFilter(prev => ({ ...prev, start: e.target.value }))}
-                  className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-200"
                 />
-                <span className="text-gray-500 inline-flex items-center">—</span>
+                <span className="text-gray-500 dark:text-gray-400 inline-flex items-center">—</span>
                 <input
                   type="date"
                   value={dateRangeFilter.end}
                   onChange={(e) => setDateRangeFilter(prev => ({ ...prev, end: e.target.value }))}
-                  className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                  className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-200"
                 />
               </div>
             </div>
             
             {/* Фильтр по размеру позиции */}
             <div>
-              <label htmlFor="positionSizeFilter" className="block text-sm font-medium text-gray-700 mb-1">Размер позиции</label>
+              <label htmlFor="positionSizeFilter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('trades.positionSize', 'Размер позиции')}</label>
               <select
                 id="positionSizeFilter"
                 value={positionSizeFilter}
                 onChange={(e) => setPositionSizeFilter(e.target.value)}
-                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                className="shadow-sm focus:ring-purple-500 focus:border-purple-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 transition-colors duration-200"
               >
-                <option value="all">Любой размер</option>
-                <option value="small">Маленькие</option>
-                <option value="medium">Средние</option>
-                <option value="large">Большие</option>
+                <option value="all">{t('trades.anySize', 'Любой размер')}</option>
+                <option value="small">{t('trades.small', 'Маленькие')}</option>
+                <option value="medium">{t('trades.medium', 'Средние')}</option>
+                <option value="large">{t('trades.large', 'Большие')}</option>
               </select>
             </div>
             
@@ -541,9 +546,9 @@ function TradeList() {
                   type="checkbox" 
                   checked={groupByMonth} 
                   onChange={(e) => handleGroupByMonthChange(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className="form-checkbox h-4 w-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 bg-white dark:bg-gray-700"
                 />
-                <span className="ml-2 text-sm text-gray-700">Группировать по месяцам</span>
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">{t('trades.groupByMonth', 'Группировать по месяцам')}</span>
               </label>
               
               <label className="flex items-center cursor-pointer">
@@ -551,9 +556,9 @@ function TradeList() {
                   type="checkbox" 
                   checked={groupByEntryPrice} 
                   onChange={(e) => handleGroupByEntryPriceChange(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className="form-checkbox h-4 w-4 text-purple-600 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 bg-white dark:bg-gray-700"
                 />
-                <span className="ml-2 text-sm text-gray-700">Группировать по цене входа</span>
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">{t('trades.groupByPrice', 'Группировать по цене входа')}</span>
               </label>
               
               <button 
@@ -564,199 +569,111 @@ function TradeList() {
                   setPositionSizeFilter('all');
                   setFilter('');
                 }}
-                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
               >
-                Сбросить фильтры
+                {t('trades.resetFilters', 'Сбросить фильтры')}
               </button>
             </div>
           </div>
-          
-          {/* Индикатор активных фильтров */}
-          {(filter || symbolFilter || dateRangeFilter.start || dateRangeFilter.end || profitabilityFilter !== 'all' || positionSizeFilter !== 'all') && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="text-xs text-gray-500">Активные фильтры:</span>
-              {filter && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  Поиск: {filter}
-                </span>
-              )}
-              {symbolFilter && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  Символ: {symbolFilter}
-                </span>
-              )}
-              {dateRangeFilter.start && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  С: {dateRangeFilter.start}
-                </span>
-              )}
-              {dateRangeFilter.end && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  По: {dateRangeFilter.end}
-                </span>
-              )}
-              {profitabilityFilter !== 'all' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  {profitabilityFilter === 'profitable' ? 'Прибыльные' : 'Убыточные'}
-                </span>
-              )}
-              {positionSizeFilter !== 'all' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  Размер: {positionSizeFilter === 'small' ? 'Маленькие' : positionSizeFilter === 'medium' ? 'Средние' : 'Большие'}
-                </span>
-              )}
-            </div>
-          )}
         </div>
       )}
 
-      {/* Расширенные элементы управления сортировкой и группировкой */}
-      <div className="mb-6 flex flex-wrap items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="text-sm font-medium text-gray-700">Сортировать по:</div>
-        <div className="flex gap-2 flex-wrap">
-          <Button 
-            variant={sortBy === 'entryDate' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('entryDate');
-              if (sortBy === 'entryDate') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Дате входа {sortBy === 'entryDate' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
+      {/* Sort and Select Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label htmlFor="sortBy" className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('trades.sortBy', 'Сортировать по')}:</label>
+            <select
+              id="sortBy"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+            >
+              <option value="entryDate">{t('trades.entryDate', 'Дате входа')}</option>
+              <option value="symbol">{t('trades.symbol', 'Символу')}</option>
+              <option value="profit">{t('trades.profit', 'Прибыли')}</option>
+              <option value="quantity">{t('trades.quantity', 'Количеству')}</option>
+            </select>
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
           
-          <Button 
-            variant={sortBy === 'symbol' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('symbol');
-              if (sortBy === 'symbol') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Тикеру {sortBy === 'symbol' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'entryPrice' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('entryPrice');
-              if (sortBy === 'entryPrice') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Цене входа {sortBy === 'entryPrice' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'totalCost' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('totalCost');
-              if (sortBy === 'totalCost') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Сумме {sortBy === 'totalCost' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'marginAmount' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('marginAmount');
-              if (sortBy === 'marginAmount') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Ставке {sortBy === 'marginAmount' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-          
-          <Button 
-            variant={sortBy === 'profit' ? 'primary' : 'outline'} 
-            size="sm"
-            onClick={() => {
-              setSortBy('profit');
-              if (sortBy === 'profit') setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-            }}
-          >
-            Прибыли {sortBy === 'profit' && (sortOrder === 'asc' ? '↑' : '↓')}
-          </Button>
-        </div>
-      </div>
-      
-      {/* Панель выбора сделок */}
-      <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            checked={selectAllChecked}
-            onChange={(e) => handleSelectAll(e.target.checked)}
-            className="h-5 w-5 text-purple-600 rounded border-gray-300 focus:ring-purple-500 mr-2"
-          />
-          <label className="text-sm font-medium text-gray-700">
-            {selectAllChecked ? 'Снять выбор' : 'Выбрать все'} 
-          </label>
-          
-          {getSelectedTradesCount() > 0 && (
-            <span className="ml-2 text-sm text-gray-500">
-              (Выбрано: {getSelectedTradesCount()})
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selectAllChecked}
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              className="h-4 w-4 text-purple-600 rounded border-gray-300 dark:border-gray-600 focus:ring-purple-500 bg-white dark:bg-gray-700"
+            />
+            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+              {t('trades.selectAll', 'Выбрать все')}
+              {getSelectedTradesCount() > 0 && (
+                <span className="ml-1 text-purple-600 dark:text-purple-400">
+                  ({t('trades.selected', 'Выбрано')}: {getSelectedTradesCount()})
+                </span>
+              )}
             </span>
-          )}
+          </label>
         </div>
         
         {getSelectedTradesCount() > 0 && (
-          <Button
-            variant="danger"
-            size="sm"
+          <button
             onClick={handleDeleteSelected}
+            className="px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
           >
-            Удалить выбранные
-          </Button>
+            {t('trades.deleteSelected', 'Удалить выбранные')}
+          </button>
         )}
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-100 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-6">
+        <div className="bg-red-100 dark:bg-red-900/50 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 px-4 py-3 rounded-lg mb-6">
           {error}
         </div>
       )}
 
       {/* Trades Grid */}
       {filteredAndSortedTrades.length === 0 ? (
-        <div className="bg-white rounded-xl p-8 text-center border border-gray-200 shadow-sm">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-8 text-center border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
+          <svg className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
-          <h3 className="mt-2 text-lg font-medium text-gray-900">Сделок не найдено</h3>
-          <p className="mt-1 text-gray-500">
-            Начните с создания новой сделки или измените параметры поиска.
+          <h3 className="mt-2 text-lg font-medium text-gray-900 dark:text-gray-100">{t('trades.noTrades', 'Сделок не найдено')}</h3>
+          <p className="mt-1 text-gray-500 dark:text-gray-400">
+            {t('trades.noTradesDesc', 'Начните с создания новой сделки или измените параметры поиска.')}
           </p>
         </div>
       ) : (groupByMonth || groupByEntryPrice) ? (
         // Сделки сгруппированы по месяцам или цене входа
         <div className="space-y-4">
           {Object.entries(groupedTrades).map(([groupKey, group]) => (
-            <div key={groupKey} className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            <div key={groupKey} className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm transition-colors duration-300">
               <div
-                className="p-4 flex justify-between items-center bg-gray-50 cursor-pointer"
+                className="p-4 flex justify-between items-center bg-gray-50 dark:bg-gray-700 cursor-pointer transition-colors duration-300"
                 onClick={() => toggleGroup(groupKey)}
               >
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-bold text-gray-900 capitalize">{group.label}</h3>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 capitalize">{group.label}</h3>
                   <div className="flex gap-2 items-center text-sm">
-                    <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                      {group.totalQuantity} шт.
+                    <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
+                      {group.totalQuantity} {t('trades.pcs', 'шт.')}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
                       {group.totalSum.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="text-sm text-gray-500">
-                    {group.trades.length} сделок
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {group.trades.length} {t('trades.trades', 'сделок')}
                   </div>
                   <svg
-                    className={`h-5 w-5 text-gray-500 transition-transform ${collapsedGroups[groupKey] ? 'rotate-180' : ''}`}
+                    className={`h-5 w-5 text-gray-500 dark:text-gray-400 transition-transform ${collapsedGroups[groupKey] ? 'rotate-180' : ''}`}
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 20 20"
                     fill="currentColor"
@@ -788,11 +705,13 @@ function TradeList() {
       {/* Sell Modal */}
       {sellingTrade && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">Закрыть сделку {sellingTrade.symbol}</h3>
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full transition-colors duration-300">
+            <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-gray-100">
+              {t('trades.closeTrade', 'Закрыть сделку')} {sellingTrade.symbol}
+            </h3>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Цена выхода (₽)
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('trades.exitPrice', 'Цена выхода')} (₽)
               </label>
               <input
                 type="number"
@@ -800,25 +719,26 @@ function TradeList() {
                 step="0.01"
                 value={sellPrice}
                 onChange={(e) => setSellPrice(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button
-                variant="secondary"
+              <button
                 onClick={() => {
                   setSellingTrade(null);
                   setSellPrice('');
                 }}
+                className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
               >
-                Отмена
-              </Button>
-              <Button
+                {t('common.cancel', 'Отмена')}
+              </button>
+              <button
                 disabled={!sellPrice}
                 onClick={() => handleSell(sellingTrade)}
+                className="px-3 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
               >
-                Закрыть сделку
-              </Button>
+                {t('trades.closeTrade', 'Закрыть сделку')}
+              </button>
             </div>
           </div>
         </div>
@@ -875,23 +795,23 @@ function TradeList() {
     return (
       <div
         key={trade.id}
-        className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
+        className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow duration-200"
       >
         {/* Card Header */}
-        <div className="p-3 flex justify-between items-center border-b border-gray-100 bg-gray-50">
+        <div className="p-3 flex justify-between items-center border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 transition-colors duration-300">
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
               checked={selectedTrades[trade.id] || false}
               onChange={() => handleToggleSelect(trade.id)}
-              className="h-4 w-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+              className="h-4 w-4 text-purple-600 rounded border-gray-300 dark:border-gray-600 focus:ring-purple-500 bg-white dark:bg-gray-600"
             />
-            <div className="text-lg font-semibold text-gray-900">{trade.symbol}</div>
-            <div className={`text-xs px-2 py-0.5 rounded-full ${isOpenTrade ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
-              {isOpenTrade ? 'Открыта' : 'Закрыта'}
+            <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">{trade.symbol}</div>
+            <div className={`text-xs px-2 py-0.5 rounded-full ${isOpenTrade ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300' : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'}`}>
+              {isOpenTrade ? t('trades.open', 'Открыта') : t('trades.closed', 'Закрыта')}
             </div>
           </div>
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
             {format(parseDateLocal(trade.entryDate), 'd MMM yyyy', { locale: ru })}
           </div>
         </div>
@@ -901,15 +821,15 @@ function TradeList() {
           <div className="grid grid-cols-2 gap-2 text-sm">
             {/* Первая строка: цены */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Вход:</span>
-              <span className="font-medium">
+              <span className="text-gray-500 dark:text-gray-400">{t('trades.entry', 'Вход')}:</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">
                 {Number(trade.entryPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
               </span>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Выход:</span>
-              <span className="font-medium">
+              <span className="text-gray-500 dark:text-gray-400">{t('trades.exit', 'Выход')}:</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">
                 {trade.exitPrice
                   ? Number(trade.exitPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })
                   : '—'}
@@ -918,41 +838,41 @@ function TradeList() {
             
             {/* Вторая строка: количество и сумма */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Кол-во:</span>
-              <span className="font-medium">{trade.quantity}</span>
+              <span className="text-gray-500 dark:text-gray-400">{t('trades.quantity', 'Кол-во')}:</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">{trade.quantity}</span>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Сумма:</span>
-              <span className="font-medium">
+              <span className="text-gray-500 dark:text-gray-400">{t('trades.amount', 'Сумма')}:</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">
                 {roundedTotalCost.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
               </span>
             </div>
             
             {/* Третья строка: ставка и проценты */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Ставка:</span>
-              <span className="px-1.5 py-0.5 rounded bg-purple-50 text-purple-800 text-xs font-medium">
+              <span className="text-gray-500 dark:text-gray-400">{t('trades.rate', 'Ставка')}:</span>
+              <span className="px-1.5 py-0.5 rounded bg-purple-50 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 text-xs font-medium">
                 {trade.marginAmount}%
               </span>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Ежедн. %:</span>
-              <span className="font-medium">
+              <span className="text-gray-500 dark:text-gray-400">{t('trades.dailyPercent', 'Ежедн. %')}:</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100">
                 {roundedDailyInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
               </span>
             </div>
             
             {/* Четвертая строка: дни и накопленные проценты */}
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Дней:</span>
-              <span className="font-medium text-right max-w-[70px] truncate" title={daysHeld}>{daysHeld}</span>
+              <span className="text-gray-500 dark:text-gray-400">{t('trades.days', 'Дней')}:</span>
+              <span className="font-medium text-gray-900 dark:text-gray-100 text-right max-w-[70px] truncate" title={daysHeld}>{daysHeld}</span>
             </div>
             
             <div className="flex items-center justify-between">
-              <span className="text-gray-500">Накоплено %:</span>
-              <span className="font-medium text-red-600 text-right max-w-[90px] truncate" title={accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}>
+              <span className="text-gray-500 dark:text-gray-400">{t('trades.accumulated', 'Накоплено %')}:</span>
+              <span className="font-medium text-red-600 dark:text-red-400 text-right max-w-[90px] truncate" title={accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}>
                 {accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
               </span>
             </div>
@@ -960,24 +880,24 @@ function TradeList() {
 
           {/* Блок прибыли для закрытых сделок */}
           {!isOpenTrade && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded p-2">
+            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <div className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded p-2 transition-colors duration-300">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Прибыль без %</div>
-                    <div className={`font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('trades.profitWithoutPercent', 'Прибыль без %')}</div>
+                    <div className={`font-semibold ${profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {profit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                      <span className="text-xs ml-1 text-gray-500">
+                      <span className="text-xs ml-1 text-gray-500 dark:text-gray-400">
                         ({profitPercent.toFixed(1)}%)
                       </span>
                     </div>
                   </div>
                   
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Итоговая прибыль</div>
-                    <div className={`font-semibold ${profitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('trades.finalProfit', 'Итоговая прибыль')}</div>
+                    <div className={`font-semibold ${profitAfterInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {profitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                      <span className="text-xs ml-1 text-gray-500">
+                      <span className="text-xs ml-1 text-gray-500 dark:text-gray-400">
                         ({profitAfterInterestPercent.toFixed(1)}%)
                       </span>
                     </div>
@@ -989,31 +909,31 @@ function TradeList() {
 
           {/* Блок потенциальной прибыли для открытых сделок при наличии курса */}
           {isOpenTrade && currentPrice && parseFloat(currentPrice) > 0 && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded p-2">
+            <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded p-2 transition-colors duration-300">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">Потенциальная прибыль</div>
-                    <div className={`font-semibold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('trades.potentialProfit', 'Потенциальная прибыль')}</div>
+                    <div className={`font-semibold ${potentialProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                      <span className="text-xs ml-1 text-gray-500">
+                      <span className="text-xs ml-1 text-gray-500 dark:text-gray-400">
                         ({potentialProfitPercent.toFixed(1)}%)
                       </span>
                     </div>
                   </div>
                   
                   <div>
-                    <div className="text-xs text-gray-500 mb-1">После вычета %</div>
-                    <div className={`font-semibold ${potentialProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('trades.afterDeduction', 'После вычета %')}</div>
+                    <div className={`font-semibold ${potentialProfitAfterInterest >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                       {potentialProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                      <span className="text-xs ml-1 text-gray-500">
+                      <span className="text-xs ml-1 text-gray-500 dark:text-gray-400">
                         ({potentialProfitAfterInterestPercent.toFixed(1)}%)
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="text-xs text-right text-gray-500 mt-1">
-                  При курсе {parseFloat(currentPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
+                <div className="text-xs text-right text-gray-500 dark:text-gray-400 mt-1">
+                  {t('trades.atRate', 'При курсе')} {parseFloat(currentPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
                 </div>
               </div>
             </div>
@@ -1021,32 +941,28 @@ function TradeList() {
 
           {/* Заметки, если есть */}
           {trade.notes && (
-            <div className="mt-3 pt-2 border-t border-gray-100">
-              <div className="text-xs text-gray-500">Заметки</div>
-              <div className="text-sm text-gray-700 italic">{trade.notes}</div>
+            <div className="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+              <div className="text-xs text-gray-500 dark:text-gray-400">{t('trades.notes', 'Заметки')}</div>
+              <div className="text-sm text-gray-700 dark:text-gray-300 italic">{trade.notes}</div>
             </div>
           )}
 
           {/* Кнопки действий */}
-          <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex gap-2">
             {isOpenTrade && (
-              <Button
-                variant="primary"
-                size="sm"
-                className="flex-1"
+              <button
+                className="flex-1 px-3 py-2 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
                 onClick={() => setSellingTrade(trade)}
               >
-                Закрыть
-              </Button>
+                {t('trades.close', 'Закрыть')}
+              </button>
             )}
-            <Button
-              variant="danger"
-              size="sm"
-              className="flex-1"
+            <button
+              className="flex-1 px-3 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
               onClick={() => handleDelete(trade.id)}
             >
-              Удалить
-            </Button>
+              {t('common.delete', 'Удалить')}
+            </button>
           </div>
         </div>
       </div>

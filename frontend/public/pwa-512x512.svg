@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#7c3aed" rx="64"/>
+  <circle cx="256" cy="200" r="80" fill="white"/>
+  <rect x="180" y="320" width="152" height="100" fill="white" rx="20"/>
+  <text x="256" y="480" font-family="Arial, sans-serif" font-size="32" font-weight="bold" fill="white" text-anchor="middle">Portfolio Risk</text>
+</svg> 
