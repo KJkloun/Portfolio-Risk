@@ -1,0 +1,78 @@
+{
+  "app": {
+    "title": "Portfolio Risk",
+    "description": "Trading Portfolio Management System"
+  },
+  "navigation": {
+    "trades": "Trades",
+    "newTrade": "New Trade",
+    "import": "Import",
+    "statistics": "Statistics", 
+    "stockPrices": "Stock Prices",
+    "analytics": "Analytics"
+  },
+  "trades": {
+    "list": "Trades List",
+    "add": "Add Trade",
+    "edit": "Edit Trade",
+    "delete": "Delete Trade",
+    "sell": "Sell",
+    "symbol": "Symbol",
+    "entryPrice": "Entry Price",
+    "exitPrice": "Exit Price",
+    "quantity": "Quantity",
+    "entryDate": "Entry Date",
+    "exitDate": "Exit Date",
+    "profit": "Profit",
+    "totalCost": "Total Cost",
+    "dailyInterest": "Daily Interest",
+    "notes": "Notes",
+    "marginAmount": "Margin Percentage",
+    "status": {
+      "open": "Open",
+      "closed": "Closed"
+    }
+  },
+  "forms": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "reset": "Reset",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort"
+  },
+  "statistics": {
+    "totalProfit": "Total Profit",
+    "totalTrades": "Total Trades",
+    "openTrades": "Open Trades",
+    "closedTrades": "Closed Trades",
+    "winRate": "Win Rate",
+    "averageProfit": "Average Profit",
+    "monthlyProfit": "Monthly Profit",
+    "profitBySymbol": "Profit by Symbol"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Information",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "language": "Language"
+  },
+  "errors": {
+    "required": "This field is required",
+    "invalidNumber": "Please enter a valid number",
+    "invalidDate": "Please enter a valid date",
+    "networkError": "Network error",
+    "serverError": "Server error",
+    "unknownError": "Unknown error"
+  }
+} 

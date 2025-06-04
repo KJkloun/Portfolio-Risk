@@ -1,0 +1,78 @@
+{
+  "app": {
+    "title": "Portfolio Risk",
+    "description": "Система управления торговым портфелем"
+  },
+  "navigation": {
+    "trades": "Сделки",
+    "newTrade": "Новая сделка",
+    "import": "Импорт",
+    "statistics": "Статистика",
+    "stockPrices": "Курсы акций",
+    "analytics": "Аналитика"
+  },
+  "trades": {
+    "list": "Список сделок",
+    "add": "Добавить сделку",
+    "edit": "Редактировать сделку",
+    "delete": "Удалить сделку",
+    "sell": "Продать",
+    "symbol": "Тикер",
+    "entryPrice": "Цена входа",
+    "exitPrice": "Цена выхода",
+    "quantity": "Количество",
+    "entryDate": "Дата входа",
+    "exitDate": "Дата выхода",
+    "profit": "Прибыль",
+    "totalCost": "Общая стоимость",
+    "dailyInterest": "Ежедневный процент",
+    "notes": "Заметки",
+    "marginAmount": "Процент маржи",
+    "status": {
+      "open": "Открыта",
+      "closed": "Закрыта"
+    }
+  },
+  "forms": {
+    "save": "Сохранить",
+    "cancel": "Отменить",
+    "submit": "Отправить",
+    "reset": "Сбросить",
+    "search": "Поиск",
+    "filter": "Фильтр",
+    "sort": "Сортировка"
+  },
+  "statistics": {
+    "totalProfit": "Общая прибыль",
+    "totalTrades": "Всего сделок",
+    "openTrades": "Открытых сделок",
+    "closedTrades": "Закрытых сделок",
+    "winRate": "Процент успешных",
+    "averageProfit": "Средняя прибыль",
+    "monthlyProfit": "Прибыль по месяцам",
+    "profitBySymbol": "Прибыль по тикерам"
+  },
+  "common": {
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "success": "Успешно",
+    "warning": "Предупреждение",
+    "info": "Информация",
+    "confirm": "Подтвердить",
+    "yes": "Да",
+    "no": "Нет",
+    "close": "Закрыть",
+    "back": "Назад",
+    "next": "Далее",
+    "previous": "Предыдущий",
+    "language": "Язык"
+  },
+  "errors": {
+    "required": "Это поле обязательно",
+    "invalidNumber": "Введите корректное число",
+    "invalidDate": "Введите корректную дату",
+    "networkError": "Ошибка сети",
+    "serverError": "Ошибка сервера",
+    "unknownError": "Неизвестная ошибка"
+  }
+} 
