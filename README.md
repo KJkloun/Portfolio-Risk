@@ -67,7 +67,7 @@ cd backend
 
 Приложение будет доступно по адресу: http://localhost:5173
 
-API документация: http://localhost:8081
+API документация: http://localhost:8081/api/swagger-ui.html
 
 ## Основные функции
 
