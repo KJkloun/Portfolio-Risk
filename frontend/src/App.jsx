@@ -1,5 +1,6 @@
 import { Routes, Route, Link, NavLink } from 'react-router-dom';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ThemeProvider } from './contexts/ThemeContext';
 import ThemeSwitcher from './components/ThemeSwitcher';
 import LanguageSwitcher from './components/LanguageSwitcher';
@@ -12,6 +13,7 @@ import './index.css';
 
 function AppContent() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-dark-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -28,35 +30,35 @@ function AppContent() {
                 ? 'nav-link-active' 
                 : 'nav-link'
             }>
-              Сделки
+              {t('navigation.trades', 'Сделки')}
             </NavLink>
             <NavLink to="/new" className={({isActive}) => 
               isActive 
                 ? 'nav-link-active' 
                 : 'nav-link'
             }>
-              Новая сделка
+              {t('navigation.newTrade', 'Новая сделка')}
             </NavLink>
             <NavLink to="/import" className={({isActive}) => 
               isActive 
                 ? 'nav-link-active' 
                 : 'nav-link'
             }>
-              Импорт
+              {t('navigation.import', 'Импорт')}
             </NavLink>
             <NavLink to="/statistics" className={({isActive}) => 
               isActive 
                 ? 'nav-link-active' 
                 : 'nav-link'
             }>
-              Статистика
+              {t('navigation.statistics', 'Статистика')}
             </NavLink>
             <NavLink to="/stock-prices" className={({isActive}) => 
               isActive 
                 ? 'nav-link-active' 
                 : 'nav-link'
             }>
-              Курсы акций
+              {t('navigation.stockPrices', 'Курсы акций')}
             </NavLink>
           </div>
 
@@ -94,35 +96,35 @@ function AppContent() {
                   ? 'block px-3 py-2 nav-link-active' 
                   : 'block px-3 py-2 nav-link'
               }>
-                Сделки
+                {t('navigation.trades', 'Сделки')}
               </NavLink>
               <NavLink to="/new" className={({isActive}) => 
                 isActive 
                   ? 'block px-3 py-2 nav-link-active' 
                   : 'block px-3 py-2 nav-link'
               }>
-                Новая сделка
+                {t('navigation.newTrade', 'Новая сделка')}
               </NavLink>
               <NavLink to="/import" className={({isActive}) => 
                 isActive 
                   ? 'block px-3 py-2 nav-link-active' 
                   : 'block px-3 py-2 nav-link'
               }>
-                Импорт
+                {t('navigation.import', 'Импорт')}
               </NavLink>
               <NavLink to="/statistics" className={({isActive}) => 
                 isActive 
                   ? 'block px-3 py-2 nav-link-active' 
                   : 'block px-3 py-2 nav-link'
               }>
-                Статистика
+                {t('navigation.statistics', 'Статистика')}
               </NavLink>
               <NavLink to="/stock-prices" className={({isActive}) => 
                 isActive 
                   ? 'block px-3 py-2 nav-link-active' 
                   : 'block px-3 py-2 nav-link'
               }>
-                Курсы акций
+                {t('navigation.stockPrices', 'Курсы акций')}
               </NavLink>
               
               {/* Mobile Theme and Language Controls */}

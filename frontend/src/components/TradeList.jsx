@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 import { 
   calculateTotalCost, 
   calculateDailyInterestDirect, 
@@ -11,6 +12,7 @@ import {
 import Button from './common/Button';
 
 function TradeList() {
+  const { t } = useTranslation();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

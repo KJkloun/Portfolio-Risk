@@ -31,7 +31,21 @@
     "status": {
       "open": "Открыта",
       "closed": "Закрыта"
-    }
+    },
+    "newTrade": "Новая сделка",
+    "ticker": "Тикер",
+    "creditRate": "Процент за кредит (% годовых)",
+    "notesPlaceholder": "Дополнительная информация о сделке...",
+    "saveTrade": "Сохранить сделку",
+    "calculation": "Расчет расходов",
+    "yearlyInterest": "Проценты в год",
+    "profitPercent": "Прибыль %",
+    "currentPrice": "Текущая цена",
+    "openTrades": "Открытые позиции",
+    "closedTrades": "Закрытые позиции",
+    "sellTrade": "Продать",
+    "deleteTrade": "Удалить сделку",
+    "confirmDelete": "Подтвердите удаление"
   },
   "forms": {
     "save": "Сохранить",
@@ -50,7 +64,12 @@
     "winRate": "Процент успешных",
     "averageProfit": "Средняя прибыль",
     "monthlyProfit": "Прибыль по месяцам",
-    "profitBySymbol": "Прибыль по тикерам"
+    "profitBySymbol": "Прибыль по тикерам",
+    "title": "Статистика портфеля",
+    "openPositions": "Открытых позиций",
+    "totalInvested": "Всего инвестировано",
+    "currentValue": "Текущая стоимость",
+    "unrealizedPnL": "Нереализованная прибыль"
   },
   "common": {
     "loading": "Загрузка...",
@@ -65,7 +84,14 @@
     "back": "Назад",
     "next": "Далее",
     "previous": "Предыдущий",
-    "language": "Язык"
+    "language": "Язык",
+    "cancel": "Отмена",
+    "saving": "Сохранение...",
+    "delete": "Удалить",
+    "edit": "Редактировать",
+    "optional": "необязательно",
+    "filter": "Фильтр",
+    "all": "Все"
   },
   "errors": {
     "required": "Это поле обязательно",
@@ -74,5 +100,32 @@
     "networkError": "Ошибка сети",
     "serverError": "Ошибка сервера",
     "unknownError": "Неизвестная ошибка"
+  },
+  "theme": {
+    "selectTheme": "Выберите тему",
+    "light": "Светлая",
+    "dark": "Тёмная",
+    "system": "Системная",
+    "lightDescription": "Светлая тема для дневного использования",
+    "darkDescription": "Тёмная тема для комфортной работы в темноте",
+    "systemDescription": "Следует настройкам системы",
+    "quickToggle": "Быстрое переключение"
+  },
+  "stockPrices": {
+    "title": "Курсы акций",
+    "symbol": "Символ",
+    "price": "Цена",
+    "change": "Изменение",
+    "lastUpdate": "Последнее обновление",
+    "refresh": "Обновить"
+  },
+  "import": {
+    "title": "Импорт сделок",
+    "selectFile": "Выберите файл",
+    "supportedFormats": "Поддерживаемые форматы",
+    "uploadFile": "Загрузить файл",
+    "processing": "Обработка...",
+    "success": "Файл успешно загружен",
+    "error": "Ошибка при загрузке файла"
   }
 } 

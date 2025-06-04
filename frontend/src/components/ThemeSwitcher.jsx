@@ -1,28 +1,30 @@
 import React, { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useTranslation } from 'react-i18next';
 
 const ThemeSwitcher = () => {
   const { theme, toggleTheme, setLightTheme, setDarkTheme, setSystemTheme } = useTheme();
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
 
   const themes = [
     {
       id: 'light',
-      name: 'Светлая',
+      name: t('theme.light', 'Светлая'),
       icon: '☀️',
-      description: 'Светлая тема для дневного использования'
+      description: t('theme.lightDescription', 'Светлая тема для дневного использования')
     },
     {
       id: 'dark',
-      name: 'Тёмная',
+      name: t('theme.dark', 'Тёмная'),
       icon: '🌙',
-      description: 'Тёмная тема для комфортной работы в темноте'
+      description: t('theme.darkDescription', 'Тёмная тема для комфортной работы в темноте')
     },
     {
       id: 'system',
-      name: 'Системная',
+      name: t('theme.system', 'Системная'),
       icon: '💻',
-      description: 'Следует настройкам системы'
+      description: t('theme.systemDescription', 'Следует настройкам системы')
     }
   ];
 
@@ -54,8 +56,8 @@ const ThemeSwitcher = () => {
       {/* Кнопка переключения темы */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
-        title="Переключить тему"
+        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+        title={t('theme.selectTheme', 'Переключить тему')}
       >
         <span className="text-lg">{getCurrentThemeIcon()}</span>
       </button>
@@ -73,7 +75,7 @@ const ThemeSwitcher = () => {
           <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-20 overflow-hidden">
             <div className="p-3 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                Выберите тему
+                {t('theme.selectTheme', 'Выберите тему')}
               </h3>
             </div>
             
@@ -85,7 +87,7 @@ const ThemeSwitcher = () => {
                   className={`w-full px-4 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150 ${
                     (themeOption.id === theme || 
                      (themeOption.id === 'system' && !localStorage.getItem('portfolio-risk-theme')))
-                      ? 'bg-purple-50 dark:bg-purple-900/20 border-r-2 border-purple-500'
+                      ? 'bg-brand-blue-50 dark:bg-brand-blue-900/20 border-r-2 border-brand-blue-500'
                       : ''
                   }`}
                 >
@@ -101,7 +103,7 @@ const ThemeSwitcher = () => {
                     </div>
                     {(themeOption.id === theme || 
                       (themeOption.id === 'system' && !localStorage.getItem('portfolio-risk-theme'))) && (
-                      <svg className="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-brand-blue-500" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}
@@ -117,9 +119,9 @@ const ThemeSwitcher = () => {
                   toggleTheme();
                   setIsOpen(false);
                 }}
-                className="w-full px-3 py-2 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-md transition-colors duration-150"
+                className="w-full px-3 py-2 text-sm text-brand-blue-600 dark:text-brand-blue-400 hover:bg-brand-blue-50 dark:hover:bg-brand-blue-900/20 rounded-md transition-colors duration-150"
               >
-                🔄 Быстрое переключение
+                🔄 {t('theme.quickToggle', 'Быстрое переключение')}
               </button>
             </div>
           </div>
