@@ -8,6 +8,11 @@ import {
   calculateProfit, 
   calculateProfitPercentage 
 } from '../utils/calculations';
+import { 
+  calculateAccumulatedInterest, 
+  getRateChangesFromStorage,
+  calculateSavingsFromRateChanges 
+} from '../utils/interestCalculations';
 import Button from './common/Button';
 
 function TradeList() {
@@ -35,9 +40,60 @@ function TradeList() {
   const [profitabilityFilter, setProfitabilityFilter] = useState('all'); // 'all', 'profitable', 'unprofitable'
   const [positionSizeFilter, setPositionSizeFilter] = useState('all'); // 'all', 'small', 'medium', 'large'
 
+  // Состояние для изменений ставок ЦБ РФ
+  const [rateChanges, setRateChanges] = useState([]);
+
   useEffect(() => {
     loadTrades();
     loadSavedStockPrices();
+    loadRateChanges();
+  }, []);
+
+  // Загрузка изменений ставок из localStorage
+  const loadRateChanges = () => {
+    const changes = getRateChangesFromStorage();
+    setRateChanges(changes);
+  };
+
+  // Обработчик события обновления сделок из других компонентов
+  useEffect(() => {
+    const handleTradesUpdated = (event) => {
+      console.log('TradeList: Получено событие обновления сделок:', event.detail);
+      
+      // Перезагружаем список сделок после изменения ставок
+      loadTrades();
+      
+      // Очищаем выбранные сделки после обновления
+      setSelectedTrades({});
+      setSelectAllChecked(false);
+      
+      if (event.detail.source === 'floating-rates') {
+        console.log(`📋 Список сделок обновлен: применена ставка ${event.detail.newRate}% к ${event.detail.updatedTrades} сделкам`);
+      }
+    };
+
+    // Обработчик события изменения ставок ЦБ РФ
+    const handleRateChangesUpdated = (event) => {
+      console.log('TradeList: Получено событие изменения ставок ЦБ РФ:', event.detail);
+      
+      // Обновляем изменения ставок
+      setRateChanges(event.detail.rateChanges);
+      
+      // Форсируем пересчет накопленных процентов
+      setTrades(prevTrades => [...prevTrades]);
+      
+      console.log('📊 Накопленные проценты пересчитаны с учетом новых ставок ЦБ РФ');
+    };
+
+    // Добавляем слушатели событий
+    window.addEventListener('tradesUpdated', handleTradesUpdated);
+    window.addEventListener('rateChangesUpdated', handleRateChangesUpdated);
+
+    // Очищаем слушатели при размонтировании компонента
+    return () => {
+      window.removeEventListener('tradesUpdated', handleTradesUpdated);
+      window.removeEventListener('rateChangesUpdated', handleRateChangesUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -840,8 +896,8 @@ function TradeList() {
     const exitDate = trade.exitDate ? parseDateLocal(trade.exitDate) : new Date();
     const daysHeld = Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24));
     
-    // Calculate accumulated interest for the whole period
-    const accumulatedInterest = roundedDailyInterest * daysHeld;
+    // Calculate accumulated interest using new utility with CB rate changes
+    const accumulatedInterest = calculateAccumulatedInterest(trade, rateChanges);
     
     // Calculate profit if closed
     let profit = 0;

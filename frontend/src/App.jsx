@@ -5,6 +5,7 @@ import TradeList from './components/TradeList';
 import BulkImport from './components/BulkImport';
 import Statistics from './components/Statistics';
 import StockPrices from './components/StockPrices';
+import FloatingRateCalculator from './components/FloatingRateCalculator';
 import './index.css';
 
 function App() {
@@ -50,6 +51,13 @@ function App() {
                 : 'text-gray-600 hover:text-[#9333ea]'
             }>
               Курсы акций
+            </NavLink>
+            <NavLink to="/floating-rates" className={({isActive}) => 
+              isActive 
+                ? 'text-[#9333ea] font-medium' 
+                : 'text-gray-600 hover:text-[#9333ea]'
+            }>
+              Ставки ЦБ РФ
             </NavLink>
           </div>
           <div className="sm:hidden">
@@ -104,6 +112,13 @@ function App() {
               }>
                 Курсы акций
               </NavLink>
+              <NavLink to="/floating-rates" className={({isActive}) => 
+                isActive 
+                  ? 'block px-3 py-2 text-[#9333ea] font-medium' 
+                  : 'block px-3 py-2 text-gray-600 hover:text-[#9333ea]'
+              }>
+                Ставки ЦБ РФ
+              </NavLink>
             </div>
           </div>
         )}
@@ -116,6 +131,7 @@ function App() {
           <Route path="/import" element={<BulkImport />} />
           <Route path="/statistics" element={<Statistics />} />
           <Route path="/stock-prices" element={<StockPrices />} />
+          <Route path="/floating-rates" element={<FloatingRateCalculator />} />
         </Routes>
       </main>
     </div>
