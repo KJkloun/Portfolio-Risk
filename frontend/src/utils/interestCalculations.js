@@ -7,23 +7,24 @@ import { differenceInDays } from 'date-fns';
  * @returns {number} - Накопленные проценты в рублях
  */
 export const calculateAccumulatedInterest = (trade, rateChanges = []) => {
-  if (!trade || trade.exitDate) return 0;
+  if (!trade || !trade.entryDate) return 0;
 
   const entryDate = new Date(trade.entryDate);
-  const today = new Date();
+  // Для закрытых сделок используем exitDate, для открытых - сегодняшнюю дату
+  const endDate = trade.exitDate ? new Date(trade.exitDate) : new Date();
   const totalCost = Number(trade.entryPrice) * Number(trade.quantity);
   
   // Получаем изменения ставок, которые применяются к этой сделке
   const applicableChanges = rateChanges
-    .filter(change => new Date(change.date) >= entryDate)
+    .filter(change => new Date(change.date) >= entryDate && new Date(change.date) <= endDate)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   let currentDate = entryDate;
   let totalInterest = 0;
 
-  // Первый период: от открытия сделки до первого изменения ставки (или до сегодня)
-  const firstChangeDate = applicableChanges.length > 0 ? new Date(applicableChanges[0].date) : today;
-  const firstPeriodEnd = firstChangeDate > today ? today : firstChangeDate;
+  // Первый период: от открытия сделки до первого изменения ставки (или до закрытия/сегодня)
+  const firstChangeDate = applicableChanges.length > 0 ? new Date(applicableChanges[0].date) : endDate;
+  const firstPeriodEnd = firstChangeDate > endDate ? endDate : firstChangeDate;
   
   if (currentDate < firstPeriodEnd) {
     const periodDays = differenceInDays(firstPeriodEnd, currentDate);
@@ -36,15 +37,15 @@ export const calculateAccumulatedInterest = (trade, rateChanges = []) => {
   }
 
   // Последующие периоды для каждого изменения ставки
-  for (let i = 0; i < applicableChanges.length && currentDate < today; i++) {
+  for (let i = 0; i < applicableChanges.length && currentDate < endDate; i++) {
     const change = applicableChanges[i];
     const changeDate = new Date(change.date);
     const nextChangeDate = i < applicableChanges.length - 1 
       ? new Date(applicableChanges[i + 1].date) 
-      : today;
+      : endDate;
 
     const periodStart = currentDate > changeDate ? currentDate : changeDate;
-    const periodEnd = nextChangeDate > today ? today : nextChangeDate;
+    const periodEnd = nextChangeDate > endDate ? endDate : nextChangeDate;
 
     if (periodStart < periodEnd) {
       const periodDays = differenceInDays(periodEnd, periodStart);
@@ -82,17 +83,18 @@ export const getRateChangesFromStorage = () => {
  * @returns {number} - Экономия в рублях
  */
 export const calculateSavingsFromRateChanges = (trade, rateChanges = []) => {
-  if (!trade || trade.exitDate) return 0;
+  if (!trade || !trade.entryDate) return 0;
 
   const entryDate = new Date(trade.entryDate);
-  const today = new Date();
+  // Для закрытых сделок используем exitDate, для открытых - сегодняшнюю дату
+  const endDate = trade.exitDate ? new Date(trade.exitDate) : new Date();
   const totalCost = Number(trade.entryPrice) * Number(trade.quantity);
   const originalRate = Number(trade.marginAmount);
-  const daysHeld = differenceInDays(today, entryDate);
+  const daysHeld = differenceInDays(endDate, entryDate);
   
   // Находим последнее изменение ставки, применимое к этой сделке
   const applicableChanges = rateChanges
-    .filter(change => new Date(change.date) >= entryDate && new Date(change.date) <= today)
+    .filter(change => new Date(change.date) >= entryDate && new Date(change.date) <= endDate)
     .sort((a, b) => new Date(b.date) - new Date(a.date));
     
   if (applicableChanges.length === 0) return 0;
