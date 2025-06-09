@@ -620,7 +620,7 @@ function Statistics() {
         openTrades.reduce((sum, t) => sum + Number(t.quantity), 0)
       : 0;
     
-    // Calculate average entry price INCLUDING accumulated interest costs
+    // Calculate average entry price INCLUDING accumulated interest costs using the same utility
     let avgEntryPriceWithInterest = 0;
     if (openTrades.length > 0) {
       let totalCostWithInterest = 0;
@@ -631,15 +631,8 @@ function Statistics() {
         const quantity = Number(trade.quantity);
         const totalCost = entryPrice * quantity;
         
-        // Calculate accumulated interest for this trade
-        const dailyInterest = totalCost * Number(trade.marginAmount) / 100 / 365;
-        const entryDate = parseDateLocal(trade.entryDate);
-        let accumulatedInterest = 0;
-        
-        if (entryDate) {
-          const daysHeld = Math.max(1, Math.ceil((today - entryDate) / (1000 * 60 * 60 * 24)));
-          accumulatedInterest = dailyInterest * daysHeld;
-        }
+        // Use the same utility function for consistency
+        const accumulatedInterest = calculateAccumulatedInterest(trade, rateChanges);
         
         // Add interest cost to the entry price per share
         const entryPriceWithInterest = (totalCost + accumulatedInterest) / quantity;
@@ -666,31 +659,18 @@ function Statistics() {
       ? (currentPrice - avgEntryPrice) * totalOpenQuantity
       : 0;
     
-    // Calculate accumulated interest only for open trades (this is what we currently owe)
+    // Calculate accumulated interest only for open trades using the same utility
     let accumulatedInterest = 0;
     
     openTrades.forEach(trade => {
-      const totalCost = Number(trade.entryPrice) * Number(trade.quantity);
-      const dailyInterest = totalCost * Number(trade.marginAmount) / 100 / 365;
-      const entryDate = parseDateLocal(trade.entryDate);
-      if (entryDate) {
-        const daysHeld = Math.max(1, Math.ceil((today - entryDate) / (1000 * 60 * 60 * 24)));
-        accumulatedInterest += dailyInterest * daysHeld;
-      }
+      accumulatedInterest += calculateAccumulatedInterest(trade, rateChanges);
     });
     
-    // Calculate total interest paid for closed trades (for reference only)
+    // Calculate total interest paid for closed trades using the same utility
     let totalInterestPaid = 0;
     closedTrades.forEach(trade => {
       if (trade.entryDate && trade.exitDate) {
-        const totalCost = Number(trade.entryPrice) * Number(trade.quantity);
-        const dailyInterest = totalCost * Number(trade.marginAmount) / 100 / 365;
-        const entryDate = parseDateLocal(trade.entryDate);
-        const exitDate = parseDateLocal(trade.exitDate);
-        if (entryDate && exitDate) {
-          const daysHeld = Math.max(1, Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24)));
-          totalInterestPaid += dailyInterest * daysHeld;
-        }
+        totalInterestPaid += calculateAccumulatedInterest(trade, rateChanges);
       }
     });
     
