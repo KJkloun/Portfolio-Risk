@@ -7,7 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "chmod +x start.sh && ./start.sh",
+    "stop": "chmod +x stop.sh && ./stop.sh",
+    "status": "chmod +x status.sh && ./status.sh",
+    "start:backend": "cd backend && ./mvnw spring-boot:run",
+    "start:frontend": "npm run dev",
+    "start:frontend:additional": "cd frontend && npm run dev",
+    "install:all": "npm install && cd frontend && npm install && cd .."
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",
