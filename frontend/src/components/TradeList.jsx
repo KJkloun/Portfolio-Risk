@@ -14,6 +14,8 @@ import {
   calculateSavingsFromRateChanges 
 } from '../utils/interestCalculations';
 import Button from './common/Button';
+import { useNavigate } from 'react-router-dom';
+import TradeDetailsModal from './TradeDetailsModal';
 
 function TradeList() {
   const [trades, setTrades] = useState([]);
@@ -32,6 +34,7 @@ function TradeList() {
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockPrices, setStockPrices] = useState({});
+  const navigate = useNavigate();
   
   // Состояния для дополнительных фильтров
   const [isFilterPanelExpanded, setIsFilterPanelExpanded] = useState(false);
@@ -42,6 +45,8 @@ function TradeList() {
 
   // Состояние для изменений ставок ЦБ РФ
   const [rateChanges, setRateChanges] = useState([]);
+
+  const [modalTradeId, setModalTradeId] = useState(null);
 
   useEffect(() => {
     loadTrades();
@@ -273,9 +278,9 @@ function TradeList() {
       return filteredAndSortedTrades.reduce((groups, trade) => {
         const entryPrice = Number(trade.entryPrice);
         
-        // Определяем диапазоны цен - округляем до ближайших 10
-        const priceBase = Math.floor(entryPrice / 10) * 10;
-        const priceRange = `${priceBase}-${priceBase + 10}`;
+        // Определяем диапазоны цен - округляем до ближайших 5
+        const priceBase = Math.floor(entryPrice / 5) * 5;
+        const priceRange = `${priceBase}-${priceBase + 5}`;
         const priceKey = `price-${priceBase}`;
         
         if (!groups[priceKey]) {
@@ -337,7 +342,7 @@ function TradeList() {
       const initialCollapsedState = {};
       filteredAndSortedTrades.forEach(trade => {
         const entryPrice = Number(trade.entryPrice);
-        const priceBase = Math.floor(entryPrice / 10) * 10;
+        const priceBase = Math.floor(entryPrice / 5) * 5;
         const priceKey = `price-${priceBase}`;
         initialCollapsedState[priceKey] = true; // true = свернуто
       });
@@ -879,6 +884,8 @@ function TradeList() {
           </div>
         </div>
       )}
+
+      {modalTradeId && <TradeDetailsModal tradeId={modalTradeId} onClose={()=>setModalTradeId(null)} />}
     </div>
   );
 
@@ -931,7 +938,8 @@ function TradeList() {
     return (
       <div
         key={trade.id}
-        className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
+        className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
+        onClick={() => setModalTradeId(trade.id)}
       >
         {/* Card Header */}
         <div className="p-3 flex justify-between items-center border-b border-gray-100 bg-gray-50">

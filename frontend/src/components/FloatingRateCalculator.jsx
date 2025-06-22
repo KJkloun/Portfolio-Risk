@@ -41,6 +41,9 @@ function FloatingRateCalculator() {
   const [newReason, setNewReason] = useState('');
   const [showForm, setShowForm] = useState(false);
 
+  const [viewMode, setViewMode] = useState('trade'); // 'overall' | 'symbol' | 'trade'
+  const [selectedSymbol, setSelectedSymbol] = useState('');
+
   // Загрузка сделок
   const loadTrades = useCallback(async () => {
     try {
@@ -315,21 +318,17 @@ function FloatingRateCalculator() {
     };
   };
 
-  // Подготовка данных для графика ежедневных выплат
-  const prepareDailyPaymentsChartData = () => {
-    if (trades.length === 0) return null;
-
-    // Создаем данные за последние 30 дней
+  // Объект с функцией для создания графика платежей, принимает произвольный список сделок
+  const prepareDailyPaymentsChartDataGeneric = (list) => {
+    if (list.length === 0) return null;
     const days = [];
     const payments = [];
     const today = new Date();
-    
     for (let i = 29; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      
       let dailyTotal = 0;
-      trades.forEach(trade => {
+      list.forEach(trade => {
         const entryDate = new Date(trade.entryDate);
         if (date >= entryDate) {
           const currentRate = getRateForTradeOnDate(trade, date);
@@ -337,19 +336,17 @@ function FloatingRateCalculator() {
           dailyTotal += dailyInterest;
         }
       });
-      
       days.push(format(date, 'dd.MM', { locale: ru }));
       payments.push(Math.round(dailyTotal));
     }
-
     return {
       labels: days,
       datasets: [
         {
           label: 'Ежедневные выплаты ₽',
           data: payments,
-          borderColor: '#ef4444',
-          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
           tension: 0.4,
           fill: true,
         }
@@ -357,16 +354,178 @@ function FloatingRateCalculator() {
     };
   };
 
+  const overallPaymentsData = prepareDailyPaymentsChartDataGeneric(trades);
+  const symbolPaymentsData = selectedSymbol ? prepareDailyPaymentsChartDataGeneric(trades.filter(t=>t.symbol===selectedSymbol)) : null;
+
   const tradeDetails = selectedTrade ? calculateTradeDetails(selectedTrade) : null;
   const rateChartData = prepareRateChartData();
   const interestChartData = prepareInterestChartData();
-  const dailyPaymentsData = prepareDailyPaymentsChartData();
+
+  const availableSymbols = Array.from(new Set(trades.map(t => t.symbol))).sort();
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: { display: false },
+        ticks: {
+          color: '#9ca3af',
+          callback: (value) => `₽${value}`
+        }
+      },
+      x: {
+        grid: { display: false },
+        ticks: { color: '#9ca3af' }
+      }
+    }
+  };
+
+  const computeAggregatedDetails = (list) => {
+    if(!list || list.length === 0) return null;
+    let daysSum = 0;
+    let rateSum = 0;
+    let interestSum = 0;
+    let savingsSum = 0;
+    list.forEach(tr => {
+      const det = calculateTradeDetails(tr);
+      daysSum += det.daysHeld;
+      rateSum += det.currentRate;
+      interestSum += det.totalInterest;
+      savingsSum += det.savingsFromRateChanges;
+    });
+    return {
+      daysHeld: Math.round(daysSum / list.length),
+      currentRate: (rateSum / list.length).toFixed(1),
+      totalInterest: interestSum,
+      savings: savingsSum
+    };
+  };
+
+  const overallDetails = computeAggregatedDetails(trades);
+  const symbolDetails = viewMode==='symbol' && selectedSymbol ? computeAggregatedDetails(trades.filter(t=>t.symbol===selectedSymbol)) : null;
+  const aggregatedChartData = viewMode==='overall' ? overallPaymentsData : symbolPaymentsData;
+
+  // --- Aggregation helpers for rate/interest charts and periods table ---
+  const aggregatePeriods = (list) => {
+    const aggregated = {};
+    list.forEach(tr => {
+      const det = calculateTradeDetails(tr);
+      det.periods.forEach(p => {
+        const key = `${p.startDate}_${p.endDate}_${p.rate}`;
+        if(!aggregated[key]) {
+          aggregated[key] = { ...p };
+        } else {
+          aggregated[key].interest += p.interest;
+          aggregated[key].days += p.days;
+        }
+      });
+    });
+    return Object.values(aggregated).sort((a,b)=> new Date(a.startDate) - new Date(b.startDate));
+  };
+
+  const prepareAggregatedRateChartData = (periods) => {
+    if(!periods || periods.length===0) return null;
+    const labels = [];
+    const data = [];
+    periods.forEach((p,idx)=>{
+      labels.push(format(new Date(p.startDate), 'dd.MM', {locale:ru}));
+      data.push(p.rate);
+      if(idx===periods.length-1){
+        labels.push(format(new Date(p.endDate), 'dd.MM', {locale:ru}));
+        data.push(p.rate);
+      }
+    });
+    return {
+      labels,
+      datasets:[{
+        label:'Ставка %',
+        data,
+        borderColor:'#3b82f6',
+        backgroundColor:'rgba(59,130,246,0.1)',
+        tension:0,
+        pointRadius:2
+      }]
+    };
+  };
+
+  const prepareAggregatedInterestChartData = (periods) => {
+    if(!periods || periods.length===0) return null;
+    const first = periods[0];
+    const restSum = periods.slice(1).reduce((sum,p)=>sum+p.interest,0);
+    return {
+      labels:[`${format(new Date(first.startDate),'dd.MM', {locale:ru})} - ${format(new Date(first.endDate),'dd.MM',{locale:ru})}`, 'Остальные'],
+      datasets:[{
+        label:'Проценты ₽',
+        data:[Math.round(first.interest), Math.round(restSum)],
+        backgroundColor:['#ef4444','#10b981']
+      }]
+    };
+  };
+
+  const overallPeriods = aggregatePeriods(trades);
+  const symbolPeriods = viewMode==='symbol' && selectedSymbol ? aggregatePeriods(trades.filter(t=>t.symbol===selectedSymbol)) : [];
+
+  const overallRateChartData = prepareAggregatedRateChartData(overallPeriods);
+  const overallInterestChartData = prepareAggregatedInterestChartData(overallPeriods);
+  const symbolRateChartData = prepareAggregatedRateChartData(symbolPeriods);
+  const symbolInterestChartData = prepareAggregatedInterestChartData(symbolPeriods);
 
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Загрузка...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if(false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+        <div className="container-fluid p-4 max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-6">
+            <h3 className="text-2xl font-light text-gray-800 mb-2">Ставки ЦБ РФ</h3>
+            <p className="text-gray-500">Анализ процентных выплат</p>
+          </div>
+
+          {/* Переключатель режимов */}
+          <div className="mb-4 flex gap-2">
+            {['overall','symbol','trade'].map(m => (
+              <button key={m} onClick={()=>setViewMode(m)} className={`px-3 py-1.5 rounded-lg text-sm ${viewMode===m ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'}`}>{m==='overall' ? 'Общая' : m==='symbol' ? 'По акциям' : 'По сделкам'}</button>
+            ))}
+          </div>
+
+          {viewMode==='overall' && (
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-4">
+              <h6 className="text-base font-medium text-gray-700 mb-1">Ежедневные выплаты (все сделки)</h6>
+              {overallPaymentsData && (
+                <Line data={overallPaymentsData} options={chartOptions} height={220} />
+              )}
+            </div>
+          )}
+
+          {viewMode==='symbol' && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm mr-2">Акция:</label>
+                <select value={selectedSymbol} onChange={e=>setSelectedSymbol(e.target.value)} className="border px-2 py-1 rounded">
+                  <option value="">-- выберите --</option>
+                  {availableSymbols.map(s=>(<option key={s} value={s}>{s}</option>))}
+                </select>
+              </div>
+              {selectedSymbol && symbolPaymentsData && (
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-4">
+                  <h6 className="text-base font-medium text-gray-700 mb-1">Ежедневные выплаты — {selectedSymbol}</h6>
+                  <Line data={symbolPaymentsData} options={chartOptions} height={220} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -380,6 +539,13 @@ function FloatingRateCalculator() {
           <h3 className="text-2xl font-light text-gray-800 mb-2">Ставки ЦБ РФ</h3>
           <p className="text-gray-500">Управление изменениями ставки и анализ влияния на открытые позиции</p>
         </div>
+
+        {/* Переключатель режимов (перемещён в блок "Открытые позиции") */}
+        {false && (<div className="mb-4 flex gap-2">
+          {['overall','symbol','trade'].map(m => (
+            <button key={m} onClick={()=>setViewMode(m)} className={`px-3 py-1.5 rounded-lg text-sm ${viewMode===m ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'}`}>{m==='overall' ? 'Общая' : m==='symbol' ? 'По акциям' : 'По сделкам'}</button>
+          ))}
+        </div>)}
 
         {/* Rate Changes Management and Daily Payments */}
         <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -496,34 +662,10 @@ function FloatingRateCalculator() {
               <p className="text-xs text-gray-400 mb-3">Общая сумма ежедневных процентных выплат за последние 30 дней</p>
             </div>
             <div className="px-4 pb-3">
-              {dailyPaymentsData && (
+              {overallPaymentsData && (
                 <Line 
-                  data={dailyPaymentsData} 
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: { display: false }
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        grid: { display: false },
-                        ticks: {
-                          color: '#9ca3af',
-                          font: { size: 10 },
-                          callback: function(value) { return '₽' + value.toLocaleString(); }
-                        }
-                      },
-                      x: {
-                        grid: { display: false },
-                        ticks: { 
-                          color: '#9ca3af',
-                          font: { size: 9 }
-                        }
-                      }
-                    }
-                  }}
+                  data={overallPaymentsData} 
+                  options={chartOptions}
                   height={180}
                 />
               )}
@@ -562,63 +704,75 @@ function FloatingRateCalculator() {
               <div className="px-4 py-3">
                 <h6 className="text-lg font-medium text-gray-700 mb-1">Открытые позиции</h6>
                 <p className="text-sm text-gray-400 mb-3">{trades.length} активных позиций</p>
+
+                {/* Кнопки режима статистики */}
+                <div className="flex gap-2 flex-wrap mb-2">
+                  {['trade','symbol','overall'].map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setViewMode(m)}
+                      className={`px-2 py-0.5 rounded text-xs transition-all ${viewMode===m ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'}`}
+                    >
+                      {m==='trade' ? 'По сделкам' : m==='symbol' ? 'По акциям' : 'Общая'}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto">
-                {trades.map((trade) => {
-                  const details = calculateTradeDetails(trade);
-                  const isSelected = selectedTrade?.id === trade.id;
+                {viewMode==='trade' && trades.map(tr => {
+                  const details=calculateTradeDetails(tr);
+                  const isSelected = selectedTrade?.id===tr.id;
                   return (
-                    <div
-                      key={trade.id}
-                      className={`p-2 cursor-pointer transition-all duration-300 mx-2 mb-1 rounded-xl text-sm ${
-                        isSelected 
-                          ? 'bg-gray-100 border border-gray-200 shadow-sm' 
-                          : 'bg-white/50 hover:bg-white/80 hover:shadow-sm'
-                      }`}
-                      onClick={() => setSelectedTrade(trade)}
-                    >
+                    <div key={tr.id} className={`p-2 cursor-pointer transition-all duration-300 mx-2 mb-1 rounded-xl text-sm ${isSelected?'bg-gray-100 border border-gray-200 shadow-sm':'bg-white/50 hover:bg-white/80 hover:shadow-sm'}`} onClick={()=>setSelectedTrade(tr)}>
                       <div className="flex justify-between items-start mb-1">
                         <div>
-                          <h6 className="font-semibold text-sm">{trade.symbol}</h6>
-                          <p className="text-xs text-gray-500">
-                            {trade.quantity.toLocaleString()} × ₽{trade.entryPrice}
-                          </p>
+                          <h6 className="font-semibold text-sm">{tr.symbol}</h6>
+                          <p className="text-xs text-gray-500">{tr.quantity.toLocaleString()} × ₽{tr.entryPrice}</p>
                         </div>
-                        <div className="text-right">
-                          <div className="text-xs text-gray-400">
-                            {format(new Date(trade.entryDate), 'dd.MM.yy')}
-                          </div>
-                        </div>
+                        <div className="text-right text-xs text-gray-400">{format(new Date(tr.entryDate),'dd.MM.yy')}</div>
                       </div>
-                      
                       <div className="grid grid-cols-3 gap-1 text-xs">
-                        <div>
-                          <span className="text-gray-500">Сумма:</span>
-                          <div className="font-medium text-xs">₽{(trade.totalCost/1000).toFixed(0)}k</div>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Ставка:</span>
-                          <div className="inline-block px-1 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                            {details?.currentRate}%
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Накоплено:</span>
-                          <div className="font-semibold text-red-500 text-xs">
-                            ₽{(Math.round(details?.totalInterest || 0)/1000).toFixed(0)}k
-                          </div>
-                        </div>
+                        <div><span className="text-gray-500">Сумма:</span><div className="font-medium">₽{(tr.totalCost/1000).toFixed(0)}k</div></div>
+                        <div><span className="text-gray-500">Ставка:</span><div className="inline-block px-1 py-0.5 rounded bg-gray-100 text-gray-600">{details.currentRate}%</div></div>
+                        <div><span className="text-gray-500">Накоплено:</span><div className="font-semibold text-red-500">₽{(Math.round(details.totalInterest)/1000).toFixed(0)}k</div></div>
                       </div>
                     </div>
                   );
                 })}
+
+                {viewMode==='symbol' && availableSymbols.map(sym=>{
+                  const list=trades.filter(t=>t.symbol===sym);
+                  const agg=computeAggregatedDetails(list);
+                  return (
+                    <div key={sym} className={`p-2 cursor-pointer transition-all duration-300 mx-2 mb-1 rounded-xl text-sm ${selectedSymbol===sym?'bg-gray-100 border border-gray-200 shadow-sm':'bg-white/50 hover:bg-white/80 hover:shadow-sm'}`} onClick={()=>setSelectedSymbol(sym)}>
+                      <div className="flex justify-between items-center">
+                        <h6 className="font-semibold text-sm">{sym}</h6>
+                        <span className="text-xs text-gray-400">{list.length} поз.</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1 text-xs mt-1">
+                        <div><span className="text-gray-500">Сумма:</span><div className="font-medium">₽{(list.reduce((s,t)=>s+t.totalCost,0)/1000).toFixed(0)}k</div></div>
+                        <div><span className="text-gray-500">Ср. ставка:</span><div className="inline-block px-1 py-0.5 rounded bg-gray-100 text-gray-600">{agg.currentRate}%</div></div>
+                        <div><span className="text-gray-500">Накоплено:</span><div className="font-semibold text-red-500">₽{(Math.round(agg.totalInterest)/1000).toFixed(0)}k</div></div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {viewMode==='overall' && (
+                  <div className="p-2 mx-2 mb-1 rounded-xl bg-white/50 text-sm cursor-default">
+                    <div className="flex justify-between items-center">
+                      <h6 className="font-semibold text-sm">Все позиции</h6>
+                      <span className="text-xs text-gray-400">{trades.length} поз.</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Details and Charts */}
           <div className="lg:col-span-3">
-            {tradeDetails ? (
+            {viewMode==='trade' && tradeDetails ? (
               <div className="space-y-6">
                 {/* Trade Overview */}
                 <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
@@ -770,17 +924,121 @@ function FloatingRateCalculator() {
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden h-80 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100/80 rounded-full mb-4">
-                    <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
+            ) : null}
+
+            {/* Aggregated views */}
+            {viewMode==='overall' && overallDetails && (
+              <div className="space-y-6">
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+                  <div className="px-6 py-4">
+                    <h6 className="text-xl font-light text-gray-700 mb-4">Все открытые позиции</h6>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-light text-gray-800">{overallDetails.daysHeld}</div>
+                        <div className="text-xs text-gray-400">среднее дней</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-light text-blue-500">{overallDetails.currentRate}%</div>
+                        <div className="text-xs text-gray-400">средняя ставка</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-light text-red-500">₽{Math.round(overallDetails.totalInterest).toLocaleString()}</div>
+                        <div className="text-xs text-gray-400">накоплено процентов</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-light text-green-500">₽{Math.round(overallDetails.savings).toLocaleString()}</div>
+                        <div className="text-xs text-gray-400">экономия от ЦБ</div>
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-600 mb-2">Выберите позицию</h3>
-                  <p className="text-sm text-gray-400">Выберите позицию из списка слева для просмотра детального анализа</p>
                 </div>
+                {(overallRateChartData && overallInterestChartData) && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+                      <div className="px-4 py-3"><h6 className="text-sm font-medium text-gray-700 mb-2">Динамика ставки</h6></div>
+                      <div className="px-4 pb-4"><Line data={overallRateChartData} options={chartOptions} height={150} /></div>
+                    </div>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+                      <div className="px-4 py-3"><h6 className="text-sm font-medium text-gray-700 mb-2">Проценты по периодам</h6></div>
+                      <div className="px-4 pb-4"><Bar data={overallInterestChartData} options={chartOptions} height={150} /></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Periods table */}
+                {viewMode==='symbol' && overallPeriods.length>0 && (
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+                    <div className="px-6 py-4"><h6 className="text-lg font-medium text-gray-700 mb-4">Детализация периодов</h6></div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Период</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Дни</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Ставка</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Проценты</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {overallPeriods.map((p,idx)=>(
+                            <tr key={idx} className="border-t">
+                              <td className="px-6 py-2">{format(new Date(p.startDate),'dd.MM.yy',{locale:ru})} – {format(new Date(p.endDate),'dd.MM.yy',{locale:ru})}</td>
+                              <td className="px-4 py-2">{p.days}</td>
+                              <td className="px-4 py-2"><span className="inline-block px-1 py-0.5 rounded bg-gray-100 text-gray-600">{p.rate}%</span></td>
+                              <td className="px-4 py-2 text-red-600">₽{Math.round(p.interest).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {viewMode==='symbol' && symbolDetails && (
+              <div className="space-y-6">
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+                  <div className="px-6 py-4">
+                    <h6 className="text-xl font-light text-gray-700 mb-4">{selectedSymbol}</h6>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-light text-gray-800">{symbolDetails.daysHeld}</div>
+                        <div className="text-xs text-gray-400">среднее дней</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-light text-blue-500">{symbolDetails.currentRate}%</div>
+                        <div className="text-xs text-gray-400">средняя ставка</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-light text-red-500">₽{Math.round(symbolDetails.totalInterest).toLocaleString()}</div>
+                        <div className="text-xs text-gray-400">накоплено процентов</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-light text-green-500">₽{Math.round(symbolDetails.savings).toLocaleString()}</div>
+                        <div className="text-xs text-gray-400">экономия от ЦБ</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {symbolRateChartData && symbolInterestChartData && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+                      <div className="px-4 py-3"><h6 className="text-sm font-medium text-gray-700 mb-2">Динамика ставки</h6></div>
+                      <div className="px-4 pb-4"><Line data={symbolRateChartData} options={chartOptions} height={150} /></div>
+                    </div>
+                    <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+                      <div className="px-4 py-3"><h6 className="text-sm font-medium text-gray-700 mb-2">Проценты по периодам</h6></div>
+                      <div className="px-4 pb-4"><Bar data={symbolInterestChartData} options={chartOptions} height={150} /></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {['overall','symbol'].includes(viewMode) && !aggregatedChartData && (
+              <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm p-6 text-center text-sm text-gray-500">
+                Нет данных для выбранного режима
               </div>
             )}
           </div>

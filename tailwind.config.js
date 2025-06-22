@@ -59,6 +59,20 @@ export default {
         'card-hover': '0 8px 24px rgba(0, 0, 0, 0.1)',
         'button': '0 1px 2px rgba(0, 0, 0, 0.05)',
       },
+      keyframes: {
+        fade: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        scaleIn: {
+          '0%': { opacity: '0', transform: 'scale(0.9)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+      },
+      animation: {
+        'fade-in': 'fade 0.2s ease-out forwards',
+        'scale-in': 'scaleIn 0.2s ease-out forwards',
+      },
     },
     fontFamily: {
       sans: [

@@ -2,6 +2,8 @@ package com.example.diary.controller;
 
 import com.example.diary.model.Trade;
 import com.example.diary.repository.TradeRepository;
+import com.example.diary.model.TradeClosure;
+import com.example.diary.repository.TradeClosureRepository;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +29,9 @@ public class TradeController {
 
     @Autowired
     private TradeRepository tradeRepository;
+
+    @Autowired
+    private TradeClosureRepository tradeClosureRepository;
 
     @GetMapping
     public ResponseEntity<List<Trade>> getAllTrades() {
@@ -605,6 +610,55 @@ public class TradeController {
             Map<String, String> error = new HashMap<>();
             error.put("message", "Ошибка расчета влияния: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @PostMapping("/{id}/close-part")
+    public ResponseEntity<?> closePartOfTrade(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload) {
+        try {
+            Optional<Trade> optTrade = tradeRepository.findById(id);
+            if (optTrade.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            Trade trade = optTrade.get();
+
+            // Извлечение параметров
+            if (!payload.containsKey("quantity") || !payload.containsKey("exitPrice")) {
+                return ResponseEntity.badRequest().body(Map.of("message", "quantity и exitPrice обязательны"));
+            }
+            int qty = ((Number) payload.get("quantity")).intValue();
+            BigDecimal exitPrice = new BigDecimal(payload.get("exitPrice").toString());
+            LocalDate exitDate = payload.containsKey("exitDate") && payload.get("exitDate") != null
+                    ? LocalDate.parse(payload.get("exitDate").toString())
+                    : LocalDate.now();
+            String notes = payload.getOrDefault("notes", "").toString();
+
+            // Проверки
+            if (qty <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Количество должно быть > 0"));
+            }
+            Integer openQty = trade.getOpenQuantity();
+            if (openQty == null || qty > openQty) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Недостаточно открытых лотов для закрытия"));
+            }
+
+            // Создание closure
+            TradeClosure closure = new TradeClosure();
+            closure.setTrade(trade);
+            closure.setClosedQuantity(qty);
+            closure.setExitPrice(exitPrice);
+            closure.setExitDate(exitDate);
+            closure.setNotes(notes);
+
+            tradeClosureRepository.save(closure);
+
+            // Возвращаем обновлённую сделку с открытиями и закрытиями
+            return ResponseEntity.ok(Map.of("message", "Частичное закрытие сохранено", "trade", tradeRepository.findById(id).get()));
+        } catch (Exception e) {
+            logger.error("Ошибка при частичном закрытии", e);
+            return ResponseEntity.badRequest().body(Map.of("message", "Ошибка: " + e.getMessage()));
         }
     }
 }

@@ -6,6 +6,7 @@ import BulkImport from './components/BulkImport';
 import Statistics from './components/Statistics';
 import StockPrices from './components/StockPrices';
 import FloatingRateCalculator from './components/FloatingRateCalculator';
+import TradeDetails from './components/TradeDetails';
 import './index.css';
 
 function App() {
@@ -132,6 +133,7 @@ function App() {
           <Route path="/statistics" element={<Statistics />} />
           <Route path="/stock-prices" element={<StockPrices />} />
           <Route path="/floating-rates" element={<FloatingRateCalculator />} />
+          <Route path="/trade/:id" element={<TradeDetails />} />
         </Routes>
       </main>
     </div>
