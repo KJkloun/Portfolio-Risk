@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -11,16 +12,13 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
-import { 
-  calculateAccumulatedInterest, 
-  getRateChangesFromStorage 
-} from '../utils/interestCalculations';
 
 // Initialize pdfMake with fonts
 pdfMake.vfs = pdfFonts.vfs;
@@ -43,10 +41,12 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  Filler
 );
 
 function Statistics() {
+  const { t } = useTranslation();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -55,8 +55,6 @@ function Statistics() {
   const [availableStocks, setAvailableStocks] = useState([]);
   const [showPDFOptions, setShowPDFOptions] = useState(false);
   const [selectedStocksForPDF, setSelectedStocksForPDF] = useState([]);
-  // Состояние для изменений ставок ЦБ РФ
-  const [rateChanges, setRateChanges] = useState([]);
   const [stats, setStats] = useState({
     totalCostOpen: 0,
     totalInterestDaily: 0,
@@ -76,61 +74,19 @@ function Statistics() {
     },
     monthlyProfits: {},
     upcomingTrades: [],
+    potentialProfit: 0,
+    potentialProfitAfterInterest: 0,
+    totalOverallProfit: 0,
+    totalOverallProfitAfterInterest: 0,
+    totalInterestPaid: 0,
   });
+  const [extendedTradeInfo, setExtendedTradeInfo] = useState({});
 
   // Load trades and saved stock prices when component mounts
   useEffect(() => {
     loadTrades();
     loadSavedStockPrices();
-    loadRateChanges();
   }, []);
-
-  // Загрузка изменений ставок из localStorage
-  const loadRateChanges = () => {
-    const changes = getRateChangesFromStorage();
-    setRateChanges(changes);
-  };
-
-  // Обработчик события обновления сделок из других компонентов
-  useEffect(() => {
-    const handleTradesUpdated = (event) => {
-      console.log('Statistics: Получено событие обновления сделок:', event.detail);
-      
-      // Перезагружаем сделки после изменения ставок
-      loadTrades();
-      
-      // Показываем уведомление пользователю
-      if (event.detail.source === 'floating-rates') {
-        // Можно добавить toast notification здесь
-        console.log(`📊 Статистика обновлена: применена ставка ${event.detail.newRate}% к ${event.detail.updatedTrades} сделкам`);
-      }
-    };
-
-    // Обработчик события изменения ставок ЦБ РФ
-    const handleRateChangesUpdated = (event) => {
-      console.log('Statistics: Получено событие изменения ставок ЦБ РФ:', event.detail);
-      
-      // Обновляем изменения ставок
-      setRateChanges(event.detail.rateChanges);
-      
-      // Пересчитываем статистику с новыми ставками
-      if (trades.length > 0) {
-        calculateStats(trades);
-      }
-      
-      console.log('📊 Статистика пересчитана с учетом новых ставок ЦБ РФ');
-    };
-
-    // Добавляем слушатели событий
-    window.addEventListener('tradesUpdated', handleTradesUpdated);
-    window.addEventListener('rateChangesUpdated', handleRateChangesUpdated);
-
-    // Очищаем слушатели при размонтировании компонента
-    return () => {
-      window.removeEventListener('tradesUpdated', handleTradesUpdated);
-      window.removeEventListener('rateChangesUpdated', handleRateChangesUpdated);
-    };
-  }, [trades]);
 
   // Parse date string into local date object
   const parseDateLocal = (dateStr) => {
@@ -143,17 +99,15 @@ function Statistics() {
   useEffect(() => {
     // Если есть и сделки, и сохраненные курсы, запускаем расчет
     if (trades.length > 0 && Object.keys(stockPrices).length > 0) {
-      console.log('Запускаем расчет потенциальной прибыли после загрузки сделок');
-      // Убираем задержку - вызываем сразу
       calculatePotentialProfit(trades, stockPrices);
     }
   }, [trades, stockPrices]);
 
-  // Periodically reload stock prices (every 30 seconds) - увеличиваем интервал для оптимизации
+  // Periodically reload stock prices (every 5 minutes) - сильно увеличиваем интервал
   useEffect(() => {
     const interval = setInterval(() => {
       loadSavedStockPrices();
-    }, 60000); // Увеличено до 60 секунд
+    }, 300000); // Увеличено до 5 минут
     
     return () => clearInterval(interval);
   }, []);
@@ -162,12 +116,10 @@ function Statistics() {
   const loadSavedStockPrices = () => {
     try {
       const savedPrices = localStorage.getItem('stockPrices');
-      console.log('DEBUG loadSavedStockPrices: Saved stock prices raw:', savedPrices);
       
       if (savedPrices) {
         try {
           const prices = JSON.parse(savedPrices);
-          console.log('DEBUG loadSavedStockPrices: Parsed stock prices:', prices);
           
           // Проверка, что объект не пустой и содержит валидные значения
           if (typeof prices === 'object' && Object.keys(prices).length > 0) {
@@ -177,36 +129,27 @@ function Statistics() {
             );
             
             if (hasValidPrices) {
-              console.log('DEBUG loadSavedStockPrices: Valid stock prices found:', prices);
               setStockPrices(prices);
               
               // Немедленно пересчитываем потенциальную прибыль при загрузке курсов
               if (trades.length > 0) {
                 calculatePotentialProfit(trades, prices);
-                console.log("DEBUG loadSavedStockPrices: Пересчитана потенциальная прибыль с сохраненными курсами:", prices);
               }
-            } else {
-              console.warn('DEBUG loadSavedStockPrices: No valid stock prices found in stored data');
             }
-          } else {
-            console.warn('DEBUG loadSavedStockPrices: Stored stock prices is empty or invalid');
           }
         } catch (parseError) {
-          console.error('DEBUG loadSavedStockPrices: Error parsing saved stock prices:', parseError);
+          // Молча игнорируем ошибки парсинга
         }
-      } else {
-        console.warn('DEBUG loadSavedStockPrices: No saved stock prices found in localStorage');
       }
     } catch (e) {
-      console.error('DEBUG loadSavedStockPrices: Error loading saved stock prices:', e);
+      // Молча игнорируем ошибки загрузки
     }
   };
 
   const loadTrades = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/trades');
-      console.log('Statistics API response:', response);
+      const response = await axios.get('http://localhost:8081/api/trades');
       
       if (Array.isArray(response.data)) {
         setTrades(response.data);
@@ -214,20 +157,56 @@ function Statistics() {
         const symbols = [...new Set(response.data.map(trade => trade.symbol))].sort();
         setAvailableStocks(symbols);
         calculateStats(response.data);
+        
+        // Загружаем расширенную информацию для всех сделок
+        loadExtendedTradeInfo(response.data);
+        
         setError('');
       } else {
         console.error('Statistics API returned non-array data:', response.data);
         setTrades([]);
-        setError('Данные получены в неверном формате. Пожалуйста, обратитесь к администратору.');
+        setError(t('errors.serverError', 'Данные получены в неверном формате. Пожалуйста, обратитесь к администратору.'));
       }
     } catch (err) {
       console.error('Error loading statistics:', err);
-      setError('Не удалось загрузить данные. Пожалуйста, попробуйте позже.');
+      setError(t('errors.networkError', 'Не удалось загрузить данные. Пожалуйста, попробуйте позже.'));
       setTrades([]);
     } finally {
       setLoading(false);
     }
   };
+
+  // Загрузка расширенной информации о сделках - только для открытых и только при необходимости
+  const loadExtendedTradeInfo = async (trades) => {
+    // Загружаем расширенную информацию только для открытых сделок
+    const openTrades = trades.filter(trade => trade.id && !trade.exitDate);
+    
+    // Берем только первые 50 сделок для оптимизации
+    const limitedTrades = openTrades.slice(0, 50);
+    
+    for (const trade of limitedTrades) {
+      if (!extendedTradeInfo[trade.id]) {
+        try {
+          const response = await axios.get(`http://localhost:8081/api/trades/${trade.id}/extended-info`);
+          setExtendedTradeInfo(prev => ({
+            ...prev,
+            [trade.id]: response.data
+          }));
+        } catch (error) {
+          // Игнорируем ошибки загрузки расширенной информации
+        }
+      }
+    }
+  };
+
+  // Запускаем загрузку расширенной информации при загрузке сделок (только один раз)
+  useEffect(() => {
+    if (trades.length > 0) {
+      loadExtendedTradeInfo(trades);
+      // Сразу же пересчитываем статистику
+      calculateStats(trades);
+    }
+  }, [trades]);
 
   const calculateStats = (tradesData) => {
     const calculatedStats = {
@@ -285,27 +264,39 @@ function Statistics() {
       const totalCost = Number(trade.entryPrice) * Number(trade.quantity);
       const roundedTotalCost = Math.round(totalCost * 100) / 100;
       
-      const dailyInterest = roundedTotalCost * Number(trade.marginAmount) / 100 / 365;
-      const roundedDailyInterest = Math.round(dailyInterest * 100) / 100;
-      const monthlyInterest = roundedDailyInterest * 30;
-
       if (!trade.exitDate) {
-        // Open trade
-        const entryDateOpen = parseDateLocal(trade.entryDate);
-        const daysHeld = Math.max(1, Math.ceil((today - entryDateOpen) / (1000 * 60 * 60 * 24)));
-        
-        // Calculate accumulated interest using new utility with CB rate changes
-        const accruedInterest = calculateAccumulatedInterest(trade, rateChanges);
+        // Open trade - используем данные из бэкенда
+        const extendedInfo = extendedTradeInfo[trade.id];
         
         calculatedStats.totalCostOpen += roundedTotalCost;
-        calculatedStats.totalInterestDaily += roundedDailyInterest;
-        calculatedStats.totalInterestMonthly += monthlyInterest;
         calculatedStats.totalTradesOpen += 1;
         calculatedStats.totalSharesOpen += Number(trade.quantity);
-        calculatedStats.totalAccruedInterest += accruedInterest;
         
-        // Calculate weighted average credit rate
-        totalOpenRateWeighted += Number(trade.marginAmount) * roundedTotalCost;
+        if (extendedInfo) {
+          // Используем корректные данные из бэкенда
+          const dailyInterest = extendedInfo.dailyInterestAmount || 0;
+          const accruedInterest = extendedInfo.totalInterestWithVariableRate || 0;
+          
+          calculatedStats.totalInterestDaily += dailyInterest;
+          calculatedStats.totalInterestMonthly += dailyInterest * 30;
+          calculatedStats.totalAccruedInterest += accruedInterest;
+          
+          // Используем средневзвешенную ставку по времени из бэкенда
+          const weightedRate = extendedInfo.averageWeightedInterestRate || Number(trade.marginAmount);
+          totalOpenRateWeighted += weightedRate * roundedTotalCost;
+        } else {
+          // Если расширенная информация еще не загружена, используем базовые расчеты
+          const dailyInterest = roundedTotalCost * Number(trade.marginAmount) / 100 / 365;
+          const entryDateOpen = parseDateLocal(trade.entryDate);
+          const daysHeld = Math.max(1, Math.ceil((today - entryDateOpen) / (1000 * 60 * 60 * 24)));
+          const accruedInterest = dailyInterest * daysHeld;
+          
+          calculatedStats.totalInterestDaily += dailyInterest;
+          calculatedStats.totalInterestMonthly += dailyInterest * 30;
+          calculatedStats.totalAccruedInterest += accruedInterest;
+          totalOpenRateWeighted += Number(trade.marginAmount) * roundedTotalCost;
+        }
+        
         openPositionsValue += roundedTotalCost;
         
         // Store upcoming trades data
@@ -314,14 +305,30 @@ function Statistics() {
           quantity: trade.quantity,
           entryPrice: trade.entryPrice,
           entryDate: trade.entryDate,
-          dailyInterest: roundedDailyInterest,
-          daysHeld,
+          dailyInterest: extendedInfo?.dailyInterestAmount || (roundedTotalCost * Number(trade.marginAmount) / 100 / 365),
+          daysHeld: Math.max(1, Math.ceil((today - parseDateLocal(trade.entryDate)) / (1000 * 60 * 60 * 24))),
           potentialProfit: 0,
           potentialProfitAfterInterest: 0
         });
       } else {
         // Closed trade
         calculatedStats.totalTradesClosed += 1;
+        
+        // Добавляем заплаченные проценты по закрытым сделкам из расширенной информации
+        const extendedInfo = extendedTradeInfo[trade.id];
+        if (extendedInfo && extendedInfo.totalInterestWithVariableRate) {
+          totalClosedInterest += extendedInfo.totalInterestWithVariableRate;
+        } else {
+          // Если расширенная информация не загружена, используем базовый расчет
+          if (trade.entryDate && trade.exitDate) {
+            const entryDate = parseDateLocal(trade.entryDate);
+            const exitDate = parseDateLocal(trade.exitDate);
+            const daysHeldClosed = Math.max(1, Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24)));
+            const dailyInterest = roundedTotalCost * Number(trade.marginAmount) / 100 / 365;
+            const interestForPeriod = dailyInterest * daysHeldClosed;
+            totalClosedInterest += Math.round(interestForPeriod * 100) / 100;
+          }
+        }
         
         if (trade.exitPrice) {
           const profit = (Number(trade.exitPrice) - Number(trade.entryPrice)) * Number(trade.quantity);
@@ -338,18 +345,13 @@ function Statistics() {
           const exitMonth = format(parseDateLocal(trade.exitDate), 'yyyy-MM');
           calculatedStats.monthlyProfits[exitMonth] = (calculatedStats.monthlyProfits[exitMonth] || 0) + roundedProfit;
           
-          // Monthly interests
-          calculatedStats.monthlyInterests[exitMonth] = (calculatedStats.monthlyInterests[exitMonth] || 0) + roundedDailyInterest * 30;
-          
           if (trade.entryDate && trade.exitDate) {
             const entryDate = parseDateLocal(trade.entryDate);
             const exitDate = parseDateLocal(trade.exitDate);
             const daysHeldClosed = Math.max(1, Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24)));
             
-            // Calculate interest for closed trade using new utility
-            const interestForPeriod = calculateAccumulatedInterest(trade, rateChanges);
-            const roundedInterestForPeriod = Math.round(interestForPeriod * 100) / 100;
-            totalClosedInterest += roundedInterestForPeriod;
+            // Monthly interests
+            calculatedStats.monthlyInterests[exitMonth] = (calculatedStats.monthlyInterests[exitMonth] || 0) + (extendedInfo?.dailyInterestAmount || (roundedTotalCost * Number(trade.marginAmount) / 100 / 365)) * 30;
             
             // Add to holding periods stats
             retentionPeriods.push(daysHeldClosed);
@@ -446,124 +448,47 @@ function Statistics() {
     }
   };
 
-  // Функция расчета потенциальной прибыли
+  // Функция расчета потенциальной прибыли - упрощенная версия
   const calculatePotentialProfit = (tradesData, prices = stockPrices) => {
-    console.log("DEBUG calculatePotentialProfit: Начат расчет потенциальной прибыли");
-    console.log("DEBUG calculatePotentialProfit: Цены акций:", JSON.stringify(prices));
-    console.log("DEBUG calculatePotentialProfit: Количество сделок:", tradesData.length);
-    
-    // Проверяем наличие курсов акций
-    if (!prices || Object.keys(prices).length === 0) {
-      console.warn("DEBUG calculatePotentialProfit: Нет сохраненных курсов для расчета потенциальной прибыли");
-      return;
-    }
-    
-    // Проверим, что есть хотя бы один валидный курс
-    const hasValidPrices = Object.values(prices).some(price => 
-      typeof price === 'number' && !isNaN(price) && price > 0
-    );
-    
-    if (!hasValidPrices) {
-      console.warn("DEBUG calculatePotentialProfit: Нет валидных курсов для расчета потенциальной прибыли");
-      return;
-    }
+    if (!prices || Object.keys(prices).length === 0) return;
     
     let totalPotentialProfit = 0;
     let totalPotentialProfitAfterInterest = 0;
     const today = new Date();
     
     // Расчет только для открытых сделок
-    const openTrades = tradesData.filter(trade => !trade.exitDate);
-    console.log("DEBUG calculatePotentialProfit: Открытые сделки для расчета:", openTrades.length);
-    
-    // Подробная информация о каждой открытой сделке
-    openTrades.forEach((trade, index) => {
-      console.log(`DEBUG calculatePotentialProfit: Сделка ${index + 1}:`, {
-        symbol: trade.symbol,
-        quantity: trade.quantity,
-        entryPrice: trade.entryPrice,
-        marginAmount: trade.marginAmount,
-        currentPrice: prices[trade.symbol] || 'нет курса'
-      });
-    });
-    
-    let calculatedTrades = 0;
+    const openTrades = tradesData.filter(trade => !trade.exitDate && prices[trade.symbol]);
     
     for (const trade of openTrades) {
       try {
-        // Проверяем наличие курса для данной акции и его корректность
-        if (!prices[trade.symbol]) {
-          console.warn(`DEBUG calculatePotentialProfit: Нет курса для акции ${trade.symbol}`);
-          continue;
-        }
-        
-        if (isNaN(parseFloat(prices[trade.symbol])) || parseFloat(prices[trade.symbol]) <= 0) {
-          console.warn(`DEBUG calculatePotentialProfit: Некорректный курс для акции ${trade.symbol}. Значение: ${prices[trade.symbol]}`);
-          continue;
-        }
-        
         const rate = parseFloat(prices[trade.symbol]);
         const entryPrice = Number(trade.entryPrice);
         const quantity = Number(trade.quantity);
         
-        // Проверка корректности входных данных
-        if (isNaN(entryPrice) || isNaN(quantity) || entryPrice <= 0 || quantity <= 0) {
-          console.warn(`DEBUG calculatePotentialProfit: Некорректные данные для сделки по ${trade.symbol}: цена=${entryPrice}, количество=${quantity}`);
-          continue;
-        }
-        
-        const totalCost = entryPrice * quantity;
-        
-        // Расчет потенциальной прибыли
-        const potentialProfit = (rate - entryPrice) * quantity;
-        
-        // Расчет накопленных процентов
-        let accumulatedInterest = 0;
-        try {
+        if (rate > 0 && entryPrice > 0 && quantity > 0) {
+          const totalCost = entryPrice * quantity;
+          const potentialProfit = (rate - entryPrice) * quantity;
+          
+          // Упрощенный расчет накопленных процентов
           const marginAmount = Number(trade.marginAmount) || 0;
-          if (marginAmount > 0) {
-            const dailyInterest = totalCost * marginAmount / 100 / 365;
-            const entryDate = parseDateLocal(trade.entryDate);
-            if (entryDate) {
-              const daysHeld = Math.max(1, Math.ceil((today - entryDate) / (1000 * 60 * 60 * 24)));
-              accumulatedInterest = dailyInterest * daysHeld;
-            }
-          }
-        } catch (e) {
-          console.error(`DEBUG calculatePotentialProfit: Ошибка при расчете процентов для ${trade.symbol}:`, e);
+          const dailyInterest = totalCost * marginAmount / 100 / 365;
+          const entryDate = parseDateLocal(trade.entryDate);
+          const daysHeld = entryDate ? Math.max(1, Math.ceil((today - entryDate) / (1000 * 60 * 60 * 24))) : 1;
+          const accumulatedInterest = dailyInterest * daysHeld;
+          
+          const profitAfterInterest = potentialProfit - accumulatedInterest;
+          
+          totalPotentialProfit += potentialProfit;
+          totalPotentialProfitAfterInterest += profitAfterInterest;
         }
-        
-        // Потенциальная прибыль после вычета процентов
-        const profitAfterInterest = potentialProfit - accumulatedInterest;
-        
-        totalPotentialProfit += potentialProfit;
-        totalPotentialProfitAfterInterest += profitAfterInterest;
-        
-        calculatedTrades++;
-        console.log(`DEBUG calculatePotentialProfit: Расчет для ${trade.symbol}: курс=${rate}, вход=${entryPrice}, прибыль=${potentialProfit.toFixed(2)}, проценты=${accumulatedInterest.toFixed(2)}`);
       } catch (error) {
-        console.error(`DEBUG calculatePotentialProfit: Ошибка при расчете для ${trade.symbol}:`, error);
+        // Игнорируем ошибки расчета
       }
     }
     
-    console.log(`DEBUG calculatePotentialProfit: Рассчитано ${calculatedTrades} сделок из ${openTrades.length} открытых`);
-    
-    // Если не удалось рассчитать ни одной сделки, завершаем
-    if (calculatedTrades === 0) {
-      console.warn("DEBUG calculatePotentialProfit: Не удалось рассчитать потенциальную прибыль ни для одной сделки");
-      return;
-    }
-    
-    // Рассчитываем общую прибыль с учетом закрытых сделок и потенциальной прибыли открытых
+    // Рассчитываем общую прибыль
     const totalOverallProfit = (stats.totalProfit || 0) + totalPotentialProfit;
     const totalOverallProfitAfterInterest = (stats.totalProfit || 0) + totalPotentialProfitAfterInterest;
-    
-    console.log("DEBUG calculatePotentialProfit: Итоговые расчеты:", {
-      potentialProfit: totalPotentialProfit.toFixed(2),
-      potentialProfitAfterInterest: totalPotentialProfitAfterInterest.toFixed(2),
-      totalOverallProfit: totalOverallProfit.toFixed(2),
-      totalOverallProfitAfterInterest: totalOverallProfitAfterInterest.toFixed(2)
-    });
     
     // Обновляем состояние
     setStats(prevStats => ({
@@ -602,104 +527,93 @@ function Statistics() {
     ));
   };
 
-  // Calculate stock-specific metrics
+  // Calculate stock-specific metrics - упрощенная версия без расширенной информации
   const calculateStockMetrics = (stock) => {
-    const stockTrades = trades.filter(t => t.symbol === stock);
-    
-    if (stockTrades.length === 0) return null;
-    
+    const stockTrades = trades.filter(trade => trade.symbol === stock);
+    const openTrades = stockTrades.filter(trade => !trade.exitDate);
+    const closedTrades = stockTrades.filter(trade => trade.exitDate);
+
+    let totalShares = 0;
+    let totalInvestment = 0;
+    let totalAccumulatedInterest = 0;
+    let avgWeightedRate = 0;
+    let weightedRateSum = 0;
+    let totalInterestPaid = 0;
+
     const today = new Date();
-    const openTrades = stockTrades.filter(t => !t.exitDate);
-    const closedTrades = stockTrades.filter(t => t.exitDate);
-    
-    const totalQuantity = stockTrades.reduce((sum, t) => sum + Number(t.quantity), 0);
-    const totalOpenQuantity = openTrades.reduce((sum, t) => sum + Number(t.quantity), 0);
-    
-    const avgEntryPrice = openTrades.length > 0
-      ? openTrades.reduce((sum, t) => sum + (Number(t.entryPrice) * Number(t.quantity)), 0) / 
-        openTrades.reduce((sum, t) => sum + Number(t.quantity), 0)
-      : 0;
-    
-    // Calculate average entry price INCLUDING accumulated interest costs using the same utility
-    let avgEntryPriceWithInterest = 0;
-    if (openTrades.length > 0) {
-      let totalCostWithInterest = 0;
-      let totalQuantityWithInterest = 0;
-      
-      openTrades.forEach(trade => {
-        const entryPrice = Number(trade.entryPrice);
-        const quantity = Number(trade.quantity);
-        const totalCost = entryPrice * quantity;
-        
-        // Use the same utility function for consistency
-        const accumulatedInterest = calculateAccumulatedInterest(trade, rateChanges);
-        
-        // Add interest cost to the entry price per share
-        const entryPriceWithInterest = (totalCost + accumulatedInterest) / quantity;
-        
-        totalCostWithInterest += entryPriceWithInterest * quantity;
-        totalQuantityWithInterest += quantity;
-      });
-      
-      avgEntryPriceWithInterest = totalQuantityWithInterest > 0 
-        ? totalCostWithInterest / totalQuantityWithInterest 
-        : 0;
-    }
-    
-    const totalInvested = openTrades.reduce((sum, t) => 
-      sum + (Number(t.entryPrice) * Number(t.quantity)), 0);
-    
-    const currentPrice = stockPrices[stock] || 0;
-    const currentValue = currentPrice * totalOpenQuantity;
-    
-    const totalProfit = closedTrades.reduce((sum, t) => 
-      sum + ((Number(t.exitPrice) - Number(t.entryPrice)) * Number(t.quantity)), 0);
-    
-    const potentialProfit = currentPrice > 0
-      ? (currentPrice - avgEntryPrice) * totalOpenQuantity
-      : 0;
-    
-    // Calculate accumulated interest only for open trades using the same utility
-    let accumulatedInterest = 0;
     
     openTrades.forEach(trade => {
-      accumulatedInterest += calculateAccumulatedInterest(trade, rateChanges);
+      const shares = trade.quantity;
+      const investment = trade.quantity * trade.entryPrice;
+      
+      totalShares += shares;
+      totalInvestment += investment;
+
+      const rate = trade.marginAmount || 0;
+      weightedRateSum += rate * investment;
+      
+      // Упрощенный расчет процентов без extendedInfo
+      const days = Math.ceil((today - new Date(trade.entryDate)) / (1000 * 60 * 60 * 24));
+      const dailyInterest = investment * rate / 100 / 365;
+      totalAccumulatedInterest += dailyInterest * days;
     });
-    
-    // Calculate total interest paid for closed trades using the same utility
-    let totalInterestPaid = 0;
+
+    // Упрощенный расчет процентов по закрытым сделкам
     closedTrades.forEach(trade => {
       if (trade.entryDate && trade.exitDate) {
-        totalInterestPaid += calculateAccumulatedInterest(trade, rateChanges);
+        const investment = trade.quantity * trade.entryPrice;
+        const entryDate = new Date(trade.entryDate);
+        const exitDate = new Date(trade.exitDate);
+        const days = Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24));
+        const dailyInterest = investment * (trade.marginAmount || 0) / 100 / 365;
+        totalInterestPaid += dailyInterest * days;
       }
     });
-    
-    // Profit calculations:
-    // totalProfit - this already accounts for all costs including interest for closed trades
-    // potentialProfitAfterInterest - subtract only accumulated interest for open positions
-    // overallProfitAfterInterest - sum of above two values
-    const potentialProfitAfterInterest = potentialProfit - accumulatedInterest;
-    const overallProfitAfterInterest = totalProfit + potentialProfitAfterInterest;
-    
+
+    avgWeightedRate = totalInvestment > 0 ? weightedRateSum / totalInvestment : 0;
+
+    // Расчет прибыли
+    let totalProfit = 0;
+    let profitableCount = 0;
+    closedTrades.forEach(trade => {
+      const priceProfit = (trade.exitPrice - trade.entryPrice) * trade.quantity;
+      if (priceProfit > 0) profitableCount++;
+      totalProfit += priceProfit;
+    });
+
+    const avgEntryPrice = totalShares > 0 ? totalInvestment / totalShares : 0;
+    const avgEntryPriceWithInterest = totalShares > 0 ? (totalInvestment + totalAccumulatedInterest) / totalShares : 0;
+    const currentPrice = stockPrices[stock] || avgEntryPrice;
+    const currentValue = totalShares * currentPrice;
+    const potentialProfit = currentValue - totalInvestment;
+    const overallProfit = totalProfit + potentialProfit;
+    const overallProfitAfterInterest = overallProfit - totalAccumulatedInterest - totalInterestPaid;
+    const winRate = closedTrades.length > 0 ? (profitableCount / closedTrades.length) * 100 : 0;
+
+    // Возвращаем числовые значения с защитой от undefined
     return {
-      symbol: stock,
-      totalTrades: stockTrades.length,
-      openTrades: openTrades.length,
-      closedTrades: closedTrades.length,
-      totalQuantity,
-      totalOpenQuantity,
-      avgEntryPrice,
-      avgEntryPriceWithInterest,
-      totalInvested,
-      currentPrice,
-      currentValue,
-      totalProfit, // This already includes all costs for closed trades
-      potentialProfit,
-      overallProfit: totalProfit + potentialProfit,
-      accumulatedInterest, // Only for open positions
-      totalInterestPaid, // Reference: what was paid for closed trades
-      potentialProfitAfterInterest,
-      overallProfitAfterInterest
+      totalShares: totalShares || 0,
+      totalOpenQuantity: totalShares || 0,
+      totalQuantity: totalShares || 0,
+      avgEntryPrice: avgEntryPrice || 0,
+      avgEntryPriceWithInterest: avgEntryPriceWithInterest || 0,
+      avgWeightedRate: avgWeightedRate || 0,
+      totalInvestment: totalInvestment || 0,
+      totalInvested: totalInvestment || 0,
+      totalAccumulatedInterest: totalAccumulatedInterest || 0,
+      accumulatedInterest: totalAccumulatedInterest || 0,
+      totalInterestPaid: totalInterestPaid || 0,
+      currentPrice: currentPrice || 0,
+      currentValue: currentValue || 0,
+      potentialProfit: potentialProfit || 0,
+      totalProfit: totalProfit || 0,
+      overallProfit: overallProfit || 0,
+      overallProfitAfterInterest: overallProfitAfterInterest || 0,
+      winRate: winRate || 0,
+      tradesCount: stockTrades.length || 0,
+      totalTrades: stockTrades.length || 0,
+      openTrades: openTrades.length || 0,
+      closedTrades: closedTrades.length || 0
     };
   };
 
@@ -824,20 +738,20 @@ function Statistics() {
                 widths: ['*', '*'],
                 body: [
                   ['Показатель', 'Значение'],
-                  ['Стоимость позиций', `${stockData.totalInvested.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`],
-                  ['Активных акций', stockData.totalOpenQuantity.toString()],
-                  ['Всего акций', stockData.totalQuantity.toString()],
+                  ['Стоимость позиций', `${(stockData.totalInvested || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}`],
+                  ['Активных акций', (stockData.totalShares || 0).toString()],
+                  ['Всего акций', (stockData.totalShares || 0).toString()],
                   ['', ''],
                   ['Прибыль:', ''],
-                  ['  Зафиксированная', `${stockData.totalProfit.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`],
-                  ['  Потенциальная', `${stockData.potentialProfit.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`],
-                  ['  Общая', `${stockData.overallProfit.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`],
-                  ['  Итого после %', `${stockData.overallProfitAfterInterest.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`],
+                  ['  Зафиксированная', `${(stockData.totalProfit || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}`],
+                  ['  Потенциальная', `${(stockData.potentialProfit || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}`],
+                  ['  Общая', `${(stockData.overallProfit || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}`],
+                  ['  Итого после %', `${(stockData.overallProfitAfterInterest || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}`],
                   ['', ''],
                   ['Сделки:', ''],
-                  ['  Открытые', stockData.openTrades.toString()],
-                  ['  Закрытые', stockData.closedTrades.toString()],
-                  ['  Всего', stockData.totalTrades.toString()]
+                  ['  Открытые', (stockData.openTrades || 0).toString()],
+                  ['  Закрытые', (stockData.closedTrades || 0).toString()],
+                  ['  Всего', (stockData.tradesCount || 0).toString()]
                 ]
               },
               layout: 'lightHorizontalLines',
@@ -1358,20 +1272,24 @@ function Statistics() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-600 border-r-2 border-b-2 border-transparent"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-dark-900 transition-colors duration-300">
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-brand-blue-500 border-r-2 border-b-2 border-transparent"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-dark-900 transition-colors duration-300">
       <div className="p-6 max-w-6xl mx-auto">
-        <h1 className="text-2xl font-medium text-gray-900 mb-8">Статистика торговли</h1>
+        <h1 className="text-2xl font-medium text-gray-900 dark:text-gray-100 mb-8">
+          {t('statistics.title', 'Статистика торговли')}
+        </h1>
 
         {/* Error message */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+          <div className="notification-error mb-6">
             {error}
           </div>
         )}
@@ -1379,16 +1297,16 @@ function Statistics() {
         {/* Stock Filter */}
         <div className="flex items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <label htmlFor="stockFilter" className="text-sm text-gray-600">
-              Акция:
+            <label htmlFor="stockFilter" className="text-sm text-gray-600 dark:text-gray-400">
+              {t('statistics.selectStock', 'Акция')}:
             </label>
             <select
               id="stockFilter"
               value={selectedStock}
               onChange={(e) => handleStockChange(e.target.value)}
-              className="rounded-md border-gray-300 text-sm bg-white focus:border-gray-400 focus:ring-0"
+              className="bank-select"
             >
-              <option value="all">Все акции</option>
+              <option value="all">{t('common.all', 'Все акции')}</option>
               {availableStocks.map(symbol => (
                 <option key={symbol} value={symbol}>{symbol}</option>
               ))}
@@ -1398,16 +1316,16 @@ function Statistics() {
           <div className="flex">
             <button
               onClick={() => generatePDFReport()}
-              className="px-4 py-2 text-sm text-white bg-gray-700 border border-gray-700 rounded-l-md hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400 flex items-center gap-2"
+              className="bank-button-primary rounded-r-none border-r border-brand-blue-600 flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              PDF отчет
+              {t('statistics.pdfReport', 'PDF отчет')}
             </button>
             <button
               onClick={() => setShowPDFOptions(true)}
-              className="px-2 py-2 text-sm text-white bg-gray-700 border border-l-gray-600 border-gray-700 rounded-r-md hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400"
+              className="bank-button-primary rounded-l-none border-l-0 px-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1418,16 +1336,20 @@ function Statistics() {
 
         {/* Saved stock prices info */}
         {Object.keys(stockPrices).length > 0 && (
-          <div className="mb-8 p-4 bg-white border border-gray-200 rounded-lg text-sm">
-            <div className="font-medium text-gray-700 mb-2">Текущие курсы акций:</div>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(stockPrices)
-                .filter(([_, price]) => price && !isNaN(parseFloat(price)))
-                .map(([symbol, price]) => (
-                  <span key={symbol} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                    {symbol}: {parseFloat(price).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
-                  </span>
-                ))}
+          <div className="bank-card mb-8">
+            <div className="bank-card-body">
+              <div className="font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('statistics.currentPrices', 'Текущие курсы акций')}:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(stockPrices)
+                  .filter(([_, price]) => price && !isNaN(parseFloat(price)))
+                  .map(([symbol, price]) => (
+                    <span key={symbol} className="badge badge-info">
+                      {symbol}: {parseFloat(price).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
+                    </span>
+                  ))}
+              </div>
             </div>
           </div>
         )}
@@ -1439,110 +1361,158 @@ function Statistics() {
             <div>
               {/* Detailed stats */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Сводка портфеля</h3>
-                  <div className="space-y-4">
-                    {/* Basic portfolio info */}
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Стоимость позиций</span>
-                        <span className="font-medium">{stats.totalCostOpen.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
-                      </div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Активных акций</span>
-                        <span className="font-medium">{stats.totalSharesOpen}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Средняя ставка</span>
-                        <span className="font-medium">{stats.avgCreditRate.toFixed(2)}%</span>
-                      </div>
-                    </div>
-                    
-                    {/* Profit breakdown */}
-                    <div className="border-t border-gray-100 pt-4">
-                      <div className="text-sm font-medium text-gray-700 mb-3">Прибыль:</div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Зафиксированная</span>
-                          <span className={stats.totalProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                            {stats.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                <div className="bank-card">
+                  <div className="bank-card-body">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                      {t('statistics.portfolioSummary', 'Сводка портфеля')}
+                    </h3>
+                    <div className="space-y-4">
+                      {/* Basic portfolio info */}
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.positionValue', 'Стоимость позиций')}
+                          </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">
+                            {stats.totalCostOpen.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                           </span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Потенциальная</span>
-                          <span className={stats.potentialProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                            {stats.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.activeShares', 'Активных акций')}
                           </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.totalSharesOpen}</span>
                         </div>
-                        <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                          <span className="text-gray-700 font-medium">Общая</span>
-                          <span className={`font-bold ${stats.totalOverallProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {stats.totalOverallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.averageRate', 'Средняя ставка')}
                           </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.avgCreditRate.toFixed(2)}%</span>
                         </div>
                       </div>
-                    </div>
-                    
-                    {/* Interest costs */}
-                    <div className="border-t border-gray-100 pt-4">
-                      <div className="text-sm font-medium text-gray-700 mb-3">Проценты:</div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Заплачено по закрытым</span>
-                          <span className="text-red-600 font-medium">-{stats.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                      
+                      {/* Profit breakdown */}
+                      <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                          {t('trades.profit', 'Прибыль')}:
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Накоплено по открытым</span>
-                          <span className="text-red-500">-{stats.totalAccruedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.realizedProfit', 'Зафиксированная')}
+                            </span>
+                            <span className={`font-medium ${(stats.totalProfit || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {stats.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.potentialProfit', 'Потенциальная')}
+                            </span>
+                            <span className={`font-medium ${(stats.potentialProfit || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {stats.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                            <span className="text-gray-700 dark:text-gray-300 font-medium">
+                              {t('statistics.totalProfit', 'Общая')}
+                            </span>
+                            <span className={`font-bold ${(stats.totalOverallProfit || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {stats.totalOverallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                          <span className="text-gray-700 font-medium">Итого после %</span>
-                          <span className={`font-bold ${stats.totalOverallProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {stats.totalOverallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                          </span>
+                      </div>
+                      
+                      {/* Interest costs */}
+                      <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                          {t('statistics.interests', 'Проценты')}:
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.paidOnClosed', 'Заплачено по закрытым')}
+                            </span>
+                            <span className="text-red-600 dark:text-red-400 font-medium">
+                              -{stats.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.accruedOnOpen', 'Накоплено по открытым')}
+                            </span>
+                            <span className="text-red-500 dark:text-red-400">
+                              -{stats.totalAccruedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                            <span className="text-gray-700 dark:text-gray-300 font-medium">
+                              {t('statistics.totalAfterInterest', 'Итого после %')}
+                            </span>
+                            <span className={`font-bold ${(stats.totalOverallProfitAfterInterest || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {stats.totalOverallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Активность</h3>
-                  <div className="space-y-4">
-                    {/* Trade summary */}
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Открытые сделки</span>
-                        <span className="font-medium">{stats.totalTradesOpen}</span>
-                      </div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-600">Закрытые сделки</span>
-                        <span className="font-medium">{stats.totalTradesClosed}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Всего сделок</span>
-                        <span className="font-medium">{stats.totalTradesOpen + stats.totalTradesClosed}</span>
-                      </div>
-                    </div>
-
-                    {/* Performance metrics */}
-                    <div className="border-t border-gray-100 pt-4">
-                      <div className="text-sm font-medium text-gray-700 mb-3">Эффективность:</div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Успешность</span>
-                          <span className="font-medium">
-                            {stats.totalTradesClosed > 0 ? `${Math.round((stats.totalProfit > 0 ? 1 : 0) * 100)}%` : '—'}
+                <div className="bank-card">
+                  <div className="bank-card-body">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                      {t('statistics.activity', 'Активность')}
+                    </h3>
+                    <div className="space-y-4">
+                      {/* Trade summary */}
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.openTrades', 'Открытые сделки')}
                           </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.totalTradesOpen}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.closedTrades', 'Закрытые сделки')}
+                          </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.totalTradesClosed}</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Средняя прибыль/сделка</span>
-                          <span className="font-medium">
-                            {stats.totalTradesClosed > 0 
-                              ? (stats.totalProfit / stats.totalTradesClosed).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
-                              : '—'
-                            }
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {t('statistics.totalTrades', 'Всего сделок')}
                           </span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{stats.totalTradesOpen + stats.totalTradesClosed}</span>
+                        </div>
+                      </div>
+
+                      {/* Performance metrics */}
+                      <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                          {t('statistics.performance', 'Эффективность')}:
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.winRate', 'Успешность')}
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                              {stats.totalTradesClosed > 0 ? `${Math.round((stats.totalProfit > 0 ? 1 : 0) * 100)}%` : '—'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              {t('statistics.averageProfit', 'Средняя прибыль/сделка')}
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-gray-100">
+                              {stats.totalTradesClosed > 0 
+                                ? (stats.totalProfit / stats.totalTradesClosed).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
+                                : '—'
+                              }
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1557,8 +1527,12 @@ function Statistics() {
                 const stockData = calculateStockMetrics(selectedStock);
                 
                 if (!stockData) return (
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 text-center">
-                    <p className="text-gray-500">Нет данных для выбранной акции</p>
+                  <div className="bank-card text-center">
+                    <div className="bank-card-body">
+                      <p className="text-gray-500 dark:text-gray-400">
+                        {t('statistics.noData', 'Нет данных для выбранной акции')}
+                      </p>
+                    </div>
                   </div>
                 );
                 
@@ -1566,113 +1540,173 @@ function Statistics() {
                   <div>
                     {/* Detailed stats for specific stock */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="bg-white p-6 rounded-lg border border-gray-200">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Портфель ({selectedStock})</h3>
-                        <div className="space-y-4">
-                          {/* Basic info */}
-                          <div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Стоимость позиций</span>
-                              <span className="font-medium">{stockData.totalInvested.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
-                            </div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Активных акций</span>
-                              <span className="font-medium">{stockData.totalOpenQuantity}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Всего акций</span>
-                              <span className="font-medium">{stockData.totalQuantity}</span>
-                            </div>
-                          </div>
-                          
-                          {/* Profit breakdown */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Прибыль:</div>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Зафиксированная</span>
-                                <span className={stockData.totalProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                  {stockData.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      <div className="bank-card">
+                        <div className="bank-card-body">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                            {t('statistics.portfolio', 'Портфель')} ({selectedStock})
+                          </h3>
+                          <div className="space-y-4">
+                            {/* Basic info */}
+                            <div>
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.positionValue', 'Стоимость позиций')}
+                                </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {(stockData.totalInvested || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
                                 </span>
                               </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Потенциальная</span>
-                                <span className={stockData.potentialProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                  {stockData.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.activeShares', 'Активных акций')}
                                 </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">{stockData.totalOpenQuantity}</span>
                               </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Общая</span>
-                                <span className={`font-bold ${stockData.overallProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {stockData.overallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.totalShares', 'Всего акций')}
                                 </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">{stockData.totalQuantity}</span>
                               </div>
                             </div>
-                          </div>
-                          
-                          {/* Interest costs */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Проценты:</div>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Заплачено по закрытым</span>
-                                <span className="text-red-600 font-medium">-{stockData.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                            
+                            {/* Profit breakdown */}
+                            <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                {t('trades.profit', 'Прибыль')}:
                               </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Накоплено по открытым</span>
-                                <span className="text-red-500">-{stockData.accumulatedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.realizedProfit', 'Зафиксированная')}
+                                  </span>
+                                  <span className={`font-medium ${(stockData.totalProfit || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {(stockData.totalProfit || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.potentialProfit', 'Потенциальная')}
+                                  </span>
+                                  <span className={`font-medium ${(stockData.potentialProfit || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {(stockData.potentialProfit || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {t('statistics.totalProfit', 'Общая')}
+                                  </span>
+                                  <span className={`font-bold ${(stockData.overallProfit || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {(stockData.overallProfit || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Итого после %</span>
-                                <span className={`font-bold ${stockData.overallProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {stockData.overallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
-                                </span>
+                            </div>
+                            
+                            {/* Interest costs */}
+                            <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                {t('statistics.interests', 'Проценты')}:
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.paidOnClosed', 'Заплачено по закрытым')}
+                                  </span>
+                                  <span className="text-red-600 dark:text-red-400 font-medium">
+                                    -{(stockData.totalInterestPaid || 0).toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.accruedOnOpen', 'Накоплено по открытым')}
+                                  </span>
+                                  <span className="text-red-500 dark:text-red-400">
+                                    -{(stockData.accumulatedInterest || 0).toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {t('statistics.totalAfterInterest', 'Итого после %')}
+                                  </span>
+                                  <span className={`font-bold ${(stockData.overallProfitAfterInterest || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {(stockData.overallProfitAfterInterest || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="bg-white p-6 rounded-lg border border-gray-200">
-                        <h3 className="text-lg font-medium text-gray-900 mb-4">Детали по {selectedStock}</h3>
-                        <div className="space-y-4">
-                          {/* Price info */}
-                          <div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Средняя цена входа</span>
-                              <span className="font-medium">{stockData.avgEntryPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
-                            </div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Средняя цена входа с учётом процентов</span>
-                              <span className="font-medium text-orange-600">{stockData.avgEntryPriceWithInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
-                            </div>
-                            <div className="flex justify-between text-sm mb-2">
-                              <span className="text-gray-600">Текущая цена</span>
-                              <span className="font-medium">
-                                {stockData.currentPrice > 0 ? stockData.currentPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 }) : '—'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Текущая стоимость</span>
-                              <span className="font-medium">{stockData.currentValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
-                            </div>
-                          </div>
-                          
-                          {/* Trading activity */}
-                          <div className="border-t border-gray-100 pt-4">
-                            <div className="text-sm font-medium text-gray-700 mb-3">Сделки:</div>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Открытые</span>
-                                <span className="font-medium">{stockData.openTrades}</span>
+                      <div className="bank-card">
+                        <div className="bank-card-body">
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                            {t('statistics.details', 'Детали')} по {selectedStock}
+                          </h3>
+                          <div className="space-y-4">
+                            {/* Price info */}
+                            <div>
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.averageEntryPrice', 'Средняя цена входа')}
+                                </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {(stockData.avgEntryPrice || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                              {(stockData.avgEntryPriceWithInterest || 0) > 0 && (
+                                <div className="flex justify-between text-sm mb-2">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.avgEntryPriceWithInterest', 'Средняя цена с процентами')}
+                                  </span>
+                                  <span className="font-medium text-orange-600 dark:text-orange-400">
+                                    {(stockData.avgEntryPriceWithInterest || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.currentPrice', 'Текущая цена')}
+                                </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {(stockData.currentPrice || 0) > 0 ? (stockData.currentPrice || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 }) : '—'}
+                                </span>
                               </div>
                               <div className="flex justify-between text-sm">
-                                <span className="text-gray-600">Закрытые</span>
-                                <span className="font-medium">{stockData.closedTrades}</span>
+                                <span className="text-gray-600 dark:text-gray-400">
+                                  {t('statistics.currentValue', 'Текущая стоимость')}
+                                </span>
+                                <span className="font-medium text-gray-900 dark:text-gray-100">
+                                  {(stockData.currentValue || 0).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                </span>
                               </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-                                <span className="text-gray-700 font-medium">Всего</span>
-                                <span className="font-bold">{stockData.totalTrades}</span>
+                            </div>
+                            
+                            {/* Trading activity */}
+                            <div className="border-t border-gray-100 dark:border-dark-700 pt-4">
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                {t('trades.trades', 'Сделки')}:
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.openTrades', 'Открытые')}
+                                  </span>
+                                  <span className="font-medium text-gray-900 dark:text-gray-100">{stockData.openTrades}</span>
+                                </div>
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    {t('statistics.closedTrades', 'Закрытые')}
+                                  </span>
+                                  <span className="font-medium text-gray-900 dark:text-gray-100">{stockData.closedTrades}</span>
+                                </div>
+                                <div className="flex justify-between text-sm pt-2 border-t border-gray-100 dark:border-dark-700">
+                                  <span className="text-gray-700 dark:text-gray-300 font-medium">
+                                    {t('statistics.totalTrades', 'Всего')}
+                                  </span>
+                                  <span className="font-bold text-gray-900 dark:text-gray-100">{stockData.totalTrades}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1686,34 +1720,38 @@ function Statistics() {
               {/* Stock-specific charts in minimalistic style */}
               <div className="space-y-6 mt-8">
                 {/* Monthly profit chart */}
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4">Прибыль по месяцам ({selectedStock})</h3>
-                  <div style={{ height: '300px', width: '100%' }}>
-                    <Bar
-                      data={prepareStockMonthlyProfitData(selectedStock)}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: {
-                            backgroundColor: 'white',
-                            titleColor: '#374151',
-                            bodyColor: '#6b7280',
-                            borderColor: '#d1d5db',
-                            borderWidth: 1,
-                            callbacks: {
-                              label: function(context) {
-                                return `Прибыль: ${new Intl.NumberFormat('ru-RU', {
-                                  style: 'currency',
-                                  currency: 'RUB',
-                                  maximumFractionDigits: 0
-                                }).format(context.parsed.y)}`;
+                <div className="bank-card">
+                  <div className="bank-card-body">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                      {t('statistics.profitByMonth', 'Прибыль по месяцам')} ({selectedStock})
+                    </h3>
+                    <div style={{ height: '300px', width: '100%' }}>
+                      <Bar
+                        data={prepareStockMonthlyProfitData(selectedStock)}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              backgroundColor: 'white',
+                              titleColor: '#374151',
+                              bodyColor: '#6b7280',
+                              borderColor: '#d1d5db',
+                              borderWidth: 1,
+                              callbacks: {
+                                label: function(context) {
+                                  return `Прибыль: ${new Intl.NumberFormat('ru-RU', {
+                                    style: 'currency',
+                                    currency: 'RUB',
+                                    maximumFractionDigits: 0
+                                  }).format(context.parsed.y)}`;
+                                }
                               }
                             }
                           }
-                        },
-                        scales: {
+                        }}
+                        scales={{
                           y: {
                             beginAtZero: true,
                             grid: { color: '#f3f4f6' },
@@ -1732,87 +1770,99 @@ function Statistics() {
                             grid: { display: false },
                             border: { display: false }
                           }
-                        },
-                        elements: { bar: { borderRadius: 2 } }
-                      }}
-                    />
+                        }}
+                        elements={{ bar: { borderRadius: 2 } }}
+                      />
+                    </div>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Status chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Статус позиций</h3>
-                    <div style={{ height: '250px', width: '100%' }}>
-                      <Doughnut
-                        data={prepareStockStatusData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          cutout: '70%',
-                          plugins: {
-                            legend: {
-                              position: 'bottom',
-                              labels: { padding: 20, usePointStyle: true }
+                  <div className="bank-card">
+                    <div className="bank-card-body">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                        {t('statistics.positionStatus', 'Статус позиций')}
+                      </h3>
+                      <div style={{ height: '250px', width: '100%' }}>
+                        <Doughnut
+                          data={prepareStockStatusData(selectedStock)}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '70%',
+                            plugins: {
+                              legend: {
+                                position: 'bottom',
+                                labels: { padding: 20, usePointStyle: true }
+                              }
                             }
-                          }
-                        }}
-                      />
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                   
                   {/* Price ranges chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Диапазоны цен входа</h3>
-                    <div style={{ height: '250px', width: '100%' }}>
-                      <Bar
-                        data={prepareStockEntryPriceData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: {
-                            legend: { display: false }
-                          },
-                          scales: {
-                            y: {
-                              beginAtZero: true,
-                              grid: { color: '#f3f4f6' },
-                              border: { display: false }
+                  <div className="bank-card">
+                    <div className="bank-card-body">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                        {t('statistics.entryPriceRanges', 'Диапазоны цен входа')}
+                      </h3>
+                      <div style={{ height: '250px', width: '100%' }}>
+                        <Bar
+                          data={prepareStockEntryPriceData(selectedStock)}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false }
                             },
-                            x: {
-                              grid: { display: false },
-                              border: { display: false }
-                            }
-                          },
-                          elements: { bar: { borderRadius: 2 } }
-                        }}
-                      />
+                            scales: {
+                              y: {
+                                beginAtZero: true,
+                                grid: { color: '#f3f4f6' },
+                                border: { display: false }
+                              },
+                              x: {
+                                grid: { display: false },
+                                border: { display: false }
+                              }
+                            },
+                            elements: { bar: { borderRadius: 2 } }
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                   
                   {/* Cumulative profit chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 lg:col-span-2">
-                    <h3 className="text-lg font-medium text-gray-900 mb-4">Накопленная прибыль ({selectedStock})</h3>
-                    <div style={{ height: '250px', width: '100%' }}>
-                      <Line
-                        data={prepareStockCumulativeProfitData(selectedStock)}
-                        options={{
-                          responsive: true,
-                          maintainAspectRatio: false,
-                          plugins: { legend: { display: false } },
-                          scales: {
-                            y: {
-                              grid: { color: '#f3f4f6' },
-                              border: { display: false }
+                  <div className="bank-card lg:col-span-2">
+                    <div className="bank-card-body">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                        {t('statistics.cumulativeProfit', 'Накопленная прибыль')} ({selectedStock})
+                      </h3>
+                      <div style={{ height: '250px', width: '100%' }}>
+                        <Line
+                          data={prepareStockCumulativeProfitData(selectedStock)}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                              y: {
+                                grid: { color: '#f3f4f6' },
+                                border: { display: false }
+                              },
+                              x: {
+                                grid: { display: false },
+                                border: { display: false }
+                              }
                             },
-                            x: {
-                              grid: { display: false },
-                              border: { display: false }
-                            }
-                          },
-                          interaction: { intersect: false, mode: 'index' }
-                        }}
-                      />
+                            interaction: { intersect: false, mode: 'index' }
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1825,100 +1875,112 @@ function Statistics() {
         {selectedStock === 'all' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Monthly Profit Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Прибыль по месяцам</h3>
-              {Object.keys(stats.monthlyProfits).length > 0 ? (
-                <div style={{ height: '300px' }}>
-                  <Bar 
-                    data={prepareMonthlyProfitData()} 
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          position: 'top',
-                          labels: { usePointStyle: true, padding: 20 }
-                        }
-                      },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          grid: { color: '#f3f4f6' },
-                          border: { display: false }
+            <div className="bank-card">
+              <div className="bank-card-body">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  {t('statistics.profitByMonth', 'Прибыль по месяцам')}
+                </h3>
+                {Object.keys(stats.monthlyProfits).length > 0 ? (
+                  <div style={{ height: '300px' }}>
+                    <Bar 
+                      data={prepareMonthlyProfitData()} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true, padding: 20 }
+                          }
                         },
-                        x: {
-                          grid: { display: false },
-                          border: { display: false }
-                        }
-                      },
-                      elements: { bar: { borderRadius: 2 } }
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="flex justify-center items-center h-48 text-gray-500">
-                  Нет данных для отображения
-                </div>
-              )}
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            grid: { color: '#f3f4f6' },
+                            border: { display: false }
+                          },
+                          x: {
+                            grid: { display: false },
+                            border: { display: false }
+                          }
+                        },
+                        elements: { bar: { borderRadius: 2 } }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex justify-center items-center h-48 text-gray-500">
+                    {t('statistics.noData', 'Нет данных для отображения')}
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* Daily Profit Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Среднедневная прибыль</h3>
-              {Object.keys(stats.monthlyProfits).length > 0 ? (
-                <div style={{ height: '300px' }}>
-                  <Line
-                    data={prepareDailyProfitData()}
+            <div className="bank-card">
+              <div className="bank-card-body">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  {t('statistics.averageDailyProfit', 'Среднедневная прибыль')}
+                </h3>
+                {Object.keys(stats.monthlyProfits).length > 0 ? (
+                  <div style={{ height: '300px' }}>
+                    <Line
+                      data={prepareDailyProfitData()}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            grid: { color: '#f3f4f6' },
+                            border: { display: false }
+                          },
+                          x: {
+                            grid: { display: false },
+                            border: { display: false }
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex justify-center items-center h-48 text-gray-500">
+                    {t('statistics.noData', 'Нет данных для отображения')}
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Trade Status Chart */}
+            <div className="bank-card lg:col-span-2">
+              <div className="bank-card-body">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  {t('statistics.positionStatus', 'Статус позиций')}
+                </h3>
+                <div style={{ height: '300px' }} className="flex justify-center">
+                  <Doughnut 
+                    data={{
+                      labels: ['Открытые', 'Закрытые'],
+                      datasets: [{
+                        data: [stats.totalTradesOpen, stats.totalTradesClosed],
+                        backgroundColor: ['#6b7280', '#374151'],
+                        borderWidth: 0
+                      }],
+                    }}
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          grid: { color: '#f3f4f6' },
-                          border: { display: false }
-                        },
-                        x: {
-                          grid: { display: false },
-                          border: { display: false }
+                      cutout: '70%',
+                      plugins: {
+                        legend: {
+                          position: 'right',
+                          labels: { usePointStyle: true, padding: 20 }
                         }
                       }
                     }}
                   />
                 </div>
-              ) : (
-                <div className="flex justify-center items-center h-48 text-gray-500">
-                  Нет данных для отображения
-                </div>
-              )}
-            </div>
-            
-            {/* Trade Status Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200 lg:col-span-2">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Статус позиций</h3>
-              <div style={{ height: '300px' }} className="flex justify-center">
-                <Doughnut 
-                  data={{
-                    labels: ['Открытые', 'Закрытые'],
-                    datasets: [{
-                      data: [stats.totalTradesOpen, stats.totalTradesClosed],
-                      backgroundColor: ['#6b7280', '#374151'],
-                      borderWidth: 0
-                    }],
-                  }}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    cutout: '70%',
-                    plugins: {
-                      legend: {
-                        position: 'right',
-                        labels: { usePointStyle: true, padding: 20 }
-                      }
-                    }
-                  }}
-                />
               </div>
             </div>
           </div>
@@ -1988,7 +2050,7 @@ function Statistics() {
                 }}
                 className="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-400"
               >
-                Отмена
+                {t('common.cancel', 'Отмена')}
               </button>
               <button
                 onClick={() => {
@@ -1999,7 +2061,7 @@ function Statistics() {
                 }}
                 className="px-4 py-2 text-sm text-white bg-gray-700 border border-gray-700 rounded-md hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400"
               >
-                Создать отчет
+                {t('common.create', 'Создать')}
               </button>
             </div>
           </div>

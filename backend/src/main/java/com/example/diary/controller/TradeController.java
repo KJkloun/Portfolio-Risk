@@ -2,6 +2,8 @@ package com.example.diary.controller;
 
 import com.example.diary.model.Trade;
 import com.example.diary.repository.TradeRepository;
+import com.example.diary.model.TradeClosure;
+import com.example.diary.repository.TradeClosureRepository;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,7 @@ import java.util.stream.Collectors;
 import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.time.temporal.ChronoUnit;
 
 @RestController
 @RequestMapping("/trades")
@@ -26,6 +29,9 @@ public class TradeController {
 
     @Autowired
     private TradeRepository tradeRepository;
+
+    @Autowired
+    private TradeClosureRepository tradeClosureRepository;
 
     @GetMapping
     public ResponseEntity<List<Trade>> getAllTrades() {
@@ -485,5 +491,174 @@ public class TradeController {
         result.sort((a, b) -> Double.compare((Double) b.get("profit"), (Double) a.get("profit")));
         
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/update-interest-rates")
+    public ResponseEntity<?> updateInterestRates(@RequestBody Map<String, Object> request) {
+        try {
+            logger.info("Получен запрос на обновление процентных ставок");
+            
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rateChanges = (List<Map<String, Object>>) request.get("rateChanges");
+            Boolean applyToOpenTrades = (Boolean) request.get("applyToOpenTrades");
+            
+            if (rateChanges == null || rateChanges.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Список изменений ставок пуст"));
+            }
+            
+            // Получаем все открытые сделки
+            List<Trade> openTrades = tradeRepository.findAll().stream()
+                .filter(trade -> trade.getExitDate() == null)
+                .collect(Collectors.toList());
+            
+            if (applyToOpenTrades != null && applyToOpenTrades && !openTrades.isEmpty()) {
+                // Находим самую последнюю ставку
+                @SuppressWarnings("unchecked")
+                Map<String, Object> latestRateChange = rateChanges.stream()
+                    .max((a, b) -> ((String) a.get("date")).compareTo((String) b.get("date")))
+                    .orElse(null);
+                
+                if (latestRateChange != null) {
+                    Object rateObj = latestRateChange.get("rate");
+                    BigDecimal newRate;
+                    
+                    if (rateObj instanceof Number) {
+                        newRate = BigDecimal.valueOf(((Number) rateObj).doubleValue());
+                    } else {
+                        newRate = new BigDecimal(rateObj.toString());
+                    }
+                    
+                    // Обновляем ставки во всех открытых сделках
+                    List<Trade> updatedTrades = new ArrayList<>();
+                    for (Trade trade : openTrades) {
+                        trade.setMarginAmount(newRate);
+                        Trade savedTrade = tradeRepository.save(trade);
+                        updatedTrades.add(savedTrade);
+                    }
+                    
+                    logger.info("Обновлены ставки в {} открытых сделках на {}", 
+                               updatedTrades.size(), newRate);
+                    
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", true);
+                    response.put("updatedTrades", updatedTrades.size());
+                    response.put("newRate", newRate);
+                    response.put("message", String.format("Ставка %s%% применена к %d открытым сделкам", 
+                                                        newRate, updatedTrades.size()));
+                    
+                    return ResponseEntity.ok(response);
+                }
+            }
+            
+            // Если не нужно применять к сделкам, просто возвращаем успех
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Изменения ставок сохранены");
+            response.put("rateChangesCount", rateChanges.size());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Ошибка при обновлении процентных ставок", e);
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Ошибка обновления процентных ставок: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @GetMapping("/analytics/floating-rates-impact")
+    public ResponseEntity<?> getFloatingRatesImpact(@RequestBody Map<String, Object> request) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> rateChanges = (List<Map<String, Object>>) request.get("rateChanges");
+            
+            if (rateChanges == null || rateChanges.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Список изменений ставок пуст"));
+            }
+            
+            List<Trade> openTrades = tradeRepository.findAll().stream()
+                .filter(trade -> trade.getExitDate() == null)
+                .collect(Collectors.toList());
+            
+            // Рассчитываем влияние изменения ставок на открытые позиции
+            double totalInvested = 0.0;
+            double totalInterestOld = 0.0;
+            double totalInterestNew = 0.0;
+            
+            for (Trade trade : openTrades) {
+                double investment = trade.getTotalCost();
+                totalInvested += investment;
+                
+                // Старые проценты (текущая ставка)
+                if (trade.getDailyInterestAmount() != null) {
+                    LocalDate entryDate = trade.getEntryDate();
+                    long daysHeld = ChronoUnit.DAYS.between(entryDate, LocalDate.now());
+                    totalInterestOld += trade.getDailyInterestAmount() * daysHeld;
+                }
+            }
+            
+            Map<String, Object> impact = new HashMap<>();
+            impact.put("openTrades", openTrades.size());
+            impact.put("totalInvested", Math.round(totalInvested * 100) / 100.0);
+            impact.put("totalInterestCurrent", Math.round(totalInterestOld * 100) / 100.0);
+            impact.put("rateChangesCount", rateChanges.size());
+            
+            return ResponseEntity.ok(impact);
+            
+        } catch (Exception e) {
+            logger.error("Ошибка при расчете влияния плавающих ставок", e);
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Ошибка расчета влияния: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @PostMapping("/{id}/close-part")
+    public ResponseEntity<?> closePartOfTrade(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> payload) {
+        try {
+            Optional<Trade> optTrade = tradeRepository.findById(id);
+            if (optTrade.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            Trade trade = optTrade.get();
+
+            // Извлечение параметров
+            if (!payload.containsKey("quantity") || !payload.containsKey("exitPrice")) {
+                return ResponseEntity.badRequest().body(Map.of("message", "quantity и exitPrice обязательны"));
+            }
+            int qty = ((Number) payload.get("quantity")).intValue();
+            BigDecimal exitPrice = new BigDecimal(payload.get("exitPrice").toString());
+            LocalDate exitDate = payload.containsKey("exitDate") && payload.get("exitDate") != null
+                    ? LocalDate.parse(payload.get("exitDate").toString())
+                    : LocalDate.now();
+            String notes = payload.getOrDefault("notes", "").toString();
+
+            // Проверки
+            if (qty <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Количество должно быть > 0"));
+            }
+            Integer openQty = trade.getOpenQuantity();
+            if (openQty == null || qty > openQty) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Недостаточно открытых лотов для закрытия"));
+            }
+
+            // Создание closure
+            TradeClosure closure = new TradeClosure();
+            closure.setTrade(trade);
+            closure.setClosedQuantity(qty);
+            closure.setExitPrice(exitPrice);
+            closure.setExitDate(exitDate);
+            closure.setNotes(notes);
+
+            tradeClosureRepository.save(closure);
+
+            // Возвращаем обновлённую сделку с открытиями и закрытиями
+            return ResponseEntity.ok(Map.of("message", "Частичное закрытие сохранено", "trade", tradeRepository.findById(id).get()));
+        } catch (Exception e) {
+            logger.error("Ошибка при частичном закрытии", e);
+            return ResponseEntity.badRequest().body(Map.of("message", "Ошибка: " + e.getMessage()));
+        }
     }
 }

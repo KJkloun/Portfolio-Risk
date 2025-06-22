@@ -8,7 +8,14 @@ import {
   calculateProfit, 
   calculateProfitPercentage 
 } from '../utils/calculations';
+import { 
+  calculateAccumulatedInterest, 
+  getRateChangesFromStorage,
+  calculateSavingsFromRateChanges 
+} from '../utils/interestCalculations';
 import Button from './common/Button';
+import { useNavigate } from 'react-router-dom';
+import TradeDetailsModal from './TradeDetailsModal';
 
 function TradeList() {
   const [trades, setTrades] = useState([]);
@@ -27,6 +34,7 @@ function TradeList() {
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockPrices, setStockPrices] = useState({});
+  const navigate = useNavigate();
   
   // Состояния для дополнительных фильтров
   const [isFilterPanelExpanded, setIsFilterPanelExpanded] = useState(false);
@@ -35,9 +43,62 @@ function TradeList() {
   const [profitabilityFilter, setProfitabilityFilter] = useState('all'); // 'all', 'profitable', 'unprofitable'
   const [positionSizeFilter, setPositionSizeFilter] = useState('all'); // 'all', 'small', 'medium', 'large'
 
+  // Состояние для изменений ставок ЦБ РФ
+  const [rateChanges, setRateChanges] = useState([]);
+
+  const [modalTradeId, setModalTradeId] = useState(null);
+
   useEffect(() => {
     loadTrades();
     loadSavedStockPrices();
+    loadRateChanges();
+  }, []);
+
+  // Загрузка изменений ставок из localStorage
+  const loadRateChanges = () => {
+    const changes = getRateChangesFromStorage();
+    setRateChanges(changes);
+  };
+
+  // Обработчик события обновления сделок из других компонентов
+  useEffect(() => {
+    const handleTradesUpdated = (event) => {
+      console.log('TradeList: Получено событие обновления сделок:', event.detail);
+      
+      // Перезагружаем список сделок после изменения ставок
+      loadTrades();
+      
+      // Очищаем выбранные сделки после обновления
+      setSelectedTrades({});
+      setSelectAllChecked(false);
+      
+      if (event.detail.source === 'floating-rates') {
+        console.log(`📋 Список сделок обновлен: применена ставка ${event.detail.newRate}% к ${event.detail.updatedTrades} сделкам`);
+      }
+    };
+
+    // Обработчик события изменения ставок ЦБ РФ
+    const handleRateChangesUpdated = (event) => {
+      console.log('TradeList: Получено событие изменения ставок ЦБ РФ:', event.detail);
+      
+      // Обновляем изменения ставок
+      setRateChanges(event.detail.rateChanges);
+      
+      // Форсируем пересчет накопленных процентов
+      setTrades(prevTrades => [...prevTrades]);
+      
+      console.log('📊 Накопленные проценты пересчитаны с учетом новых ставок ЦБ РФ');
+    };
+
+    // Добавляем слушатели событий
+    window.addEventListener('tradesUpdated', handleTradesUpdated);
+    window.addEventListener('rateChangesUpdated', handleRateChangesUpdated);
+
+    // Очищаем слушатели при размонтировании компонента
+    return () => {
+      window.removeEventListener('tradesUpdated', handleTradesUpdated);
+      window.removeEventListener('rateChangesUpdated', handleRateChangesUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -217,9 +278,9 @@ function TradeList() {
       return filteredAndSortedTrades.reduce((groups, trade) => {
         const entryPrice = Number(trade.entryPrice);
         
-        // Определяем диапазоны цен - округляем до ближайших 10
-        const priceBase = Math.floor(entryPrice / 10) * 10;
-        const priceRange = `${priceBase}-${priceBase + 10}`;
+        // Определяем диапазоны цен - округляем до ближайших 5
+        const priceBase = Math.floor(entryPrice / 5) * 5;
+        const priceRange = `${priceBase}-${priceBase + 5}`;
         const priceKey = `price-${priceBase}`;
         
         if (!groups[priceKey]) {
@@ -281,7 +342,7 @@ function TradeList() {
       const initialCollapsedState = {};
       filteredAndSortedTrades.forEach(trade => {
         const entryPrice = Number(trade.entryPrice);
-        const priceBase = Math.floor(entryPrice / 10) * 10;
+        const priceBase = Math.floor(entryPrice / 5) * 5;
         const priceKey = `price-${priceBase}`;
         initialCollapsedState[priceKey] = true; // true = свернуто
       });
@@ -823,6 +884,8 @@ function TradeList() {
           </div>
         </div>
       )}
+
+      {modalTradeId && <TradeDetailsModal tradeId={modalTradeId} onClose={()=>setModalTradeId(null)} />}
     </div>
   );
 
@@ -840,8 +903,8 @@ function TradeList() {
     const exitDate = trade.exitDate ? parseDateLocal(trade.exitDate) : new Date();
     const daysHeld = Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24));
     
-    // Calculate accumulated interest for the whole period
-    const accumulatedInterest = roundedDailyInterest * daysHeld;
+    // Calculate accumulated interest using new utility with CB rate changes
+    const accumulatedInterest = calculateAccumulatedInterest(trade, rateChanges);
     
     // Calculate profit if closed
     let profit = 0;
@@ -875,7 +938,8 @@ function TradeList() {
     return (
       <div
         key={trade.id}
-        className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
+        className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
+        onClick={() => setModalTradeId(trade.id)}
       >
         {/* Card Header */}
         <div className="p-3 flex justify-between items-center border-b border-gray-100 bg-gray-50">
