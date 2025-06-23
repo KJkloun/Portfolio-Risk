@@ -185,5 +185,8 @@ function TradeDetailsModal({ tradeId, onClose }) {
     </div>
   );
 }
-TradeDetailsModal.propTypes={tradeId:PropTypes.number,onClose:PropTypes.func};
+TradeDetailsModal.propTypes = {
+  tradeId: PropTypes.number,
+  onClose: PropTypes.func
+};
 export default TradeDetailsModal; 

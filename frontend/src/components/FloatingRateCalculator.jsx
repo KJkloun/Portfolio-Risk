@@ -730,13 +730,13 @@ function FloatingRateCalculator() {
                           <p className="text-xs text-gray-500">{tr.quantity.toLocaleString()} × ₽{tr.entryPrice}</p>
                         </div>
                         <div className="text-right text-xs text-gray-400">{format(new Date(tr.entryDate),'dd.MM.yy')}</div>
-                      </div>
+                          </div>
                       <div className="grid grid-cols-3 gap-1 text-xs">
                         <div><span className="text-gray-500">Сумма:</span><div className="font-medium">₽{(tr.totalCost/1000).toFixed(0)}k</div></div>
                         <div><span className="text-gray-500">Ставка:</span><div className="inline-block px-1 py-0.5 rounded bg-gray-100 text-gray-600">{details.currentRate}%</div></div>
                         <div><span className="text-gray-500">Накоплено:</span><div className="font-semibold text-red-500">₽{(Math.round(details.totalInterest)/1000).toFixed(0)}k</div></div>
+                        </div>
                       </div>
-                    </div>
                   );
                 })}
 
@@ -748,7 +748,7 @@ function FloatingRateCalculator() {
                       <div className="flex justify-between items-center">
                         <h6 className="font-semibold text-sm">{sym}</h6>
                         <span className="text-xs text-gray-400">{list.length} поз.</span>
-                      </div>
+                        </div>
                       <div className="grid grid-cols-3 gap-1 text-xs mt-1">
                         <div><span className="text-gray-500">Сумма:</span><div className="font-medium">₽{(list.reduce((s,t)=>s+t.totalCost,0)/1000).toFixed(0)}k</div></div>
                         <div><span className="text-gray-500">Ср. ставка:</span><div className="inline-block px-1 py-0.5 rounded bg-gray-100 text-gray-600">{agg.currentRate}%</div></div>
@@ -933,10 +933,10 @@ function FloatingRateCalculator() {
                   <div className="px-6 py-4">
                     <h6 className="text-xl font-light text-gray-700 mb-4">Все открытые позиции</h6>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="text-center">
+                <div className="text-center">
                         <div className="text-2xl font-light text-gray-800">{overallDetails.daysHeld}</div>
                         <div className="text-xs text-gray-400">среднее дней</div>
-                      </div>
+                  </div>
                       <div className="text-center">
                         <div className="text-2xl font-light text-blue-500">{overallDetails.currentRate}%</div>
                         <div className="text-xs text-gray-400">средняя ставка</div>
@@ -961,9 +961,9 @@ function FloatingRateCalculator() {
                     <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
                       <div className="px-4 py-3"><h6 className="text-sm font-medium text-gray-700 mb-2">Проценты по периодам</h6></div>
                       <div className="px-4 pb-4"><Bar data={overallInterestChartData} options={chartOptions} height={150} /></div>
-                    </div>
-                  </div>
-                )}
+                </div>
+              </div>
+            )}
 
                 {/* Periods table */}
                 {viewMode==='symbol' && overallPeriods.length>0 && (
@@ -990,8 +990,8 @@ function FloatingRateCalculator() {
                           ))}
                         </tbody>
                       </table>
-                    </div>
-                  </div>
+          </div>
+        </div>
                 )}
               </div>
             )}

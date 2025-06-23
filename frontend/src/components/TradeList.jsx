@@ -947,7 +947,10 @@ function TradeList() {
             <input
               type="checkbox"
               checked={selectedTrades[trade.id] || false}
-              onChange={() => handleToggleSelect(trade.id)}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleToggleSelect(trade.id);
+              }}
               className="h-4 w-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
             />
             <div className="text-lg font-semibold text-gray-900">{trade.symbol}</div>
@@ -1098,7 +1101,10 @@ function TradeList() {
                 variant="primary"
                 size="sm"
                 className="flex-1"
-                onClick={() => setSellingTrade(trade)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSellingTrade(trade);
+                }}
               >
                 Закрыть
               </Button>
@@ -1107,7 +1113,10 @@ function TradeList() {
               variant="danger"
               size="sm"
               className="flex-1"
-              onClick={() => handleDelete(trade.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(trade.id);
+              }}
             >
               Удалить
             </Button>
