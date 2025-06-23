@@ -58,6 +58,10 @@ public class Trade {
     @JsonManagedReference
     private List<TradeClosure> closures = new ArrayList<>();
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "portfolio_id")
+    private Portfolio portfolio;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -90,6 +94,9 @@ public class Trade {
 
     public List<TradeClosure> getClosures() { return closures; }
     public void setClosures(List<TradeClosure> closures) { this.closures = closures; }
+
+    public Portfolio getPortfolio() { return portfolio; }
+    public void setPortfolio(Portfolio portfolio) { this.portfolio = portfolio; }
 
     @Transient
     public Double getTotalCost() {

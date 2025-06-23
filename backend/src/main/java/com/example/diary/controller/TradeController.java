@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.temporal.ChronoUnit;
+import com.example.diary.model.Portfolio;
 
 @RestController
 @RequestMapping("/trades")
@@ -34,19 +35,31 @@ public class TradeController {
     private TradeClosureRepository tradeClosureRepository;
 
     @GetMapping
-    public ResponseEntity<List<Trade>> getAllTrades() {
+    public ResponseEntity<List<Trade>> getAllTrades(@RequestParam(required = false) Long portfolioId) {
         List<Trade> trades = tradeRepository.findAll();
+        if (portfolioId != null) {
+            trades = trades.stream()
+                    .filter(t -> t.getPortfolio() != null && t.getPortfolio().getId().equals(portfolioId))
+                    .collect(Collectors.toList());
+        }
         return ResponseEntity.ok(trades);
     }
 
     @PostMapping("/buy")
-    public ResponseEntity<?> buyTrade(@RequestBody Trade trade) {
+    public ResponseEntity<?> buyTrade(@RequestBody Trade trade, @RequestParam(required = false) Long portfolioId) {
         try {
             logger.info("Получен запрос на покупку: {}", trade);
             
             // Используем дату из запроса, если она не указана - используем текущую
             if (trade.getEntryDate() == null) {
                 trade.setEntryDate(LocalDate.now());
+            }
+            
+            // Связываем с портфелем, если указан
+            if (portfolioId != null) {
+                Portfolio p = new Portfolio();
+                p.setId(portfolioId);
+                trade.setPortfolio(p);
             }
             
             // Проверка, что необходимые поля не null

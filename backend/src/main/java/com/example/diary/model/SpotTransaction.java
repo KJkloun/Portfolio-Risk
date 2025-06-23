@@ -55,6 +55,10 @@ public class SpotTransaction {
     @Column(name = "note")
     private String note;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "portfolio_id")
+    private Portfolio portfolio;
+
     // Конструкторы
     public SpotTransaction() {}
 
@@ -112,4 +116,7 @@ public class SpotTransaction {
 
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+
+    public Portfolio getPortfolio() { return portfolio; }
+    public void setPortfolio(Portfolio portfolio) { this.portfolio = portfolio; }
 } 

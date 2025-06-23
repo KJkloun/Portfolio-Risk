@@ -4,9 +4,10 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 import axios from 'axios'
+import { AuthProvider } from './contexts/AuthContext'
 
 // Настройка axios для работы с API бэкенда
-axios.defaults.baseURL = 'http://localhost:8081';
+axios.defaults.baseURL = 'http://localhost:8081/api';
 
 // Add global error handler for debugging
 axios.interceptors.response.use(
@@ -20,7 +21,9 @@ axios.interceptors.response.use(
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )

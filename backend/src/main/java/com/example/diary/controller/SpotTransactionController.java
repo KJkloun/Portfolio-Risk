@@ -1,6 +1,7 @@
 package com.example.diary.controller;
 
 import com.example.diary.model.SpotTransaction;
+import com.example.diary.model.Portfolio;
 import com.example.diary.repository.SpotTransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,13 +21,26 @@ public class SpotTransactionController {
 
     // Получить все транзакции
     @GetMapping
-    public List<SpotTransaction> getAllTransactions() {
-        return repository.findAll();
+    public List<SpotTransaction> getAllTransactions(@RequestParam(required = false) Long portfolioId) {
+        if (portfolioId == null) {
+            return repository.findAll();
+        }
+        return repository.findAll().stream()
+                .filter(tx -> tx.getPortfolio() != null && tx.getPortfolio().getId().equals(portfolioId))
+                .collect(Collectors.toList());
     }
 
     // Создать новую транзакцию
     @PostMapping
-    public SpotTransaction createTransaction(@RequestBody SpotTransaction transaction) {
+    public SpotTransaction createTransaction(
+            @RequestBody SpotTransaction transaction,
+            @RequestParam(required = false) Long portfolioId) {
+        if (portfolioId != null) {
+            // Ленивая загрузка портфеля через EntityManager не нужна - создадим заглушку с id
+            Portfolio p = new Portfolio();
+            p.setId(portfolioId);
+            transaction.setPortfolio(p);
+        }
         return repository.save(transaction);
     }
 
