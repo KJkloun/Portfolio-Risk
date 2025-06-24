@@ -17,10 +17,12 @@ import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
-
+import { 
+  calculateAccumulatedInterest, 
+  getRateChangesFromStorage 
+} from '../utils/interestCalculations';
 // Initialize pdfMake with fonts
 pdfMake.vfs = pdfFonts.vfs;
-
 // Simple color palette for charts
 const CHART_COLORS = {
   primary: '#6b7280',
@@ -28,7 +30,6 @@ const CHART_COLORS = {
   green: '#10b981',
   red: '#ef4444'
 };
-
 // Register Chart.js components
 ChartJS.register(
   CategoryScale,
@@ -41,7 +42,6 @@ ChartJS.register(
   Tooltip,
   Legend
 );
-
 function Statistics() {
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +51,8 @@ function Statistics() {
   const [availableStocks, setAvailableStocks] = useState([]);
   const [showPDFOptions, setShowPDFOptions] = useState(false);
   const [selectedStocksForPDF, setSelectedStocksForPDF] = useState([]);
+  // Состояние для изменений ставок ЦБ РФ
+  const [rateChanges, setRateChanges] = useState([]);
   const [stats, setStats] = useState({
     totalCostOpen: 0,
     totalInterestDaily: 0,
@@ -69,22 +71,68 @@ function Statistics() {
       open: null,
     },
     monthlyProfits: {},
+    monthlyInterests: {},
     upcomingTrades: [],
+    valueAtRisk: 0,
+    expectedShortfall: 0,
+    maxDrawdown: 0,
+    roi: 0,
+    sharpeRatio: 0,
+    potentialProfit: 0,
+    potentialProfitAfterInterest: 0,
+    totalOverallProfit: 0,
+    totalOverallProfitAfterInterest: 0,
+    totalInterestPaid: 0,
   });
-
   // Load trades and saved stock prices when component mounts
   useEffect(() => {
     loadTrades();
     loadSavedStockPrices();
+    loadRateChanges();
   }, []);
-
+  // Загрузка изменений ставок из localStorage
+  const loadRateChanges = () => {
+    const changes = getRateChangesFromStorage();
+    setRateChanges(changes);
+  };
+  // Обработчик события обновления сделок из других компонентов
+  useEffect(() => {
+    const handleTradesUpdated = (event) => {
+      console.log('Statistics: Получено событие обновления сделок:', event.detail);
+      // Перезагружаем сделки после изменения ставок
+      loadTrades();
+      // Показываем уведомление пользователю
+      if (event.detail.source === 'floating-rates') {
+        // Можно добавить toast notification здесь
+        console.log(`📊 Статистика обновлена: применена ставка ${event.detail.newRate}% к ${event.detail.updatedTrades} сделкам`);
+      }
+    };
+    // Обработчик события изменения ставок ЦБ РФ
+    const handleRateChangesUpdated = (event) => {
+      console.log('Statistics: Получено событие изменения ставок ЦБ РФ:', event.detail);
+      // Обновляем изменения ставок
+      setRateChanges(event.detail.rateChanges);
+      // Пересчитываем статистику с новыми ставками
+      if (trades.length > 0) {
+        calculateStats(trades);
+      }
+      console.log('📊 Статистика пересчитана с учетом новых ставок ЦБ РФ');
+    };
+    // Добавляем слушатели событий
+    window.addEventListener('tradesUpdated', handleTradesUpdated);
+    window.addEventListener('rateChangesUpdated', handleRateChangesUpdated);
+    // Очищаем слушатели при размонтировании компонента
+    return () => {
+      window.removeEventListener('tradesUpdated', handleTradesUpdated);
+      window.removeEventListener('rateChangesUpdated', handleRateChangesUpdated);
+    };
+  }, [trades]);
   // Parse date string into local date object
   const parseDateLocal = (dateStr) => {
     if (!dateStr) return null;
     const [year, month, day] = dateStr.split('-');
     return new Date(+year, +month - 1, +day);
   };
-
   // Запускаем расчет потенциальной прибыли после успешной загрузки сделок
   useEffect(() => {
     // Если есть и сделки, и сохраненные курсы, запускаем расчет
@@ -94,38 +142,31 @@ function Statistics() {
       calculatePotentialProfit(trades, stockPrices);
     }
   }, [trades, stockPrices]);
-
   // Periodically reload stock prices (every 30 seconds) - увеличиваем интервал для оптимизации
   useEffect(() => {
     const interval = setInterval(() => {
       loadSavedStockPrices();
     }, 60000); // Увеличено до 60 секунд
-    
     return () => clearInterval(interval);
   }, []);
-
   // Load saved stock prices from localStorage
   const loadSavedStockPrices = () => {
     try {
       const savedPrices = localStorage.getItem('stockPrices');
       console.log('DEBUG loadSavedStockPrices: Saved stock prices raw:', savedPrices);
-      
       if (savedPrices) {
         try {
           const prices = JSON.parse(savedPrices);
           console.log('DEBUG loadSavedStockPrices: Parsed stock prices:', prices);
-          
           // Проверка, что объект не пустой и содержит валидные значения
           if (typeof prices === 'object' && Object.keys(prices).length > 0) {
             // Проверим, что хотя бы одна цена больше нуля
             const hasValidPrices = Object.values(prices).some(price => 
               typeof price === 'number' && !isNaN(price) && price > 0
             );
-            
             if (hasValidPrices) {
               console.log('DEBUG loadSavedStockPrices: Valid stock prices found:', prices);
               setStockPrices(prices);
-              
               // Немедленно пересчитываем потенциальную прибыль при загрузке курсов
               if (trades.length > 0) {
                 calculatePotentialProfit(trades, prices);
@@ -147,13 +188,11 @@ function Statistics() {
       console.error('DEBUG loadSavedStockPrices: Error loading saved stock prices:', e);
     }
   };
-
   const loadTrades = async () => {
     try {
       setLoading(true);
       const response = await axios.get('/api/trades');
       console.log('Statistics API response:', response);
-      
       if (Array.isArray(response.data)) {
         setTrades(response.data);
         // Extract unique stock symbols
@@ -174,7 +213,6 @@ function Statistics() {
       setLoading(false);
     }
   };
-
   const calculateStats = (tradesData) => {
     const calculatedStats = {
       totalCostOpen: 0,
@@ -204,7 +242,6 @@ function Statistics() {
       totalOverallProfitAfterInterest: 0,
       totalInterestPaid: 0,
     };
-
     let totalClosedInterest = 0;
     let totalAmountInvested = 0;
     let totalRateWeighted = 0;
@@ -212,46 +249,38 @@ function Statistics() {
     let openPositionsValue = 0;
     let retentionPeriods = [];
     let portfolioReturns = [];
-
     // Sort trades by exit date for upcoming events calculation
     const sortedTrades = [...tradesData].sort((a, b) => {
       if (!a.exitDate) return 1;
       if (!b.exitDate) return -1;
       return new Date(a.exitDate) - new Date(b.exitDate);
     });
-
     // Get open trades for upcoming events
     const openTrades = sortedTrades.filter(trade => !trade.exitDate);
     const today = new Date();
-
     tradesData.forEach(trade => {
       // Count trades by symbol
       calculatedStats.symbolCounts[trade.symbol] = (calculatedStats.symbolCounts[trade.symbol] || 0) + 1;
-
       const totalCost = Number(trade.entryPrice) * Number(trade.quantity);
       const roundedTotalCost = Math.round(totalCost * 100) / 100;
-      
       const dailyInterest = roundedTotalCost * Number(trade.marginAmount) / 100 / 365;
       const roundedDailyInterest = Math.round(dailyInterest * 100) / 100;
       const monthlyInterest = roundedDailyInterest * 30;
-
       if (!trade.exitDate) {
         // Open trade
         const entryDateOpen = parseDateLocal(trade.entryDate);
         const daysHeld = Math.max(1, Math.ceil((today - entryDateOpen) / (1000 * 60 * 60 * 24)));
-        const accruedInterest = roundedDailyInterest * daysHeld;
-        
+        // Calculate accumulated interest using new utility with CB rate changes
+        const accruedInterest = calculateAccumulatedInterest(trade, rateChanges);
         calculatedStats.totalCostOpen += roundedTotalCost;
         calculatedStats.totalInterestDaily += roundedDailyInterest;
         calculatedStats.totalInterestMonthly += monthlyInterest;
         calculatedStats.totalTradesOpen += 1;
         calculatedStats.totalSharesOpen += Number(trade.quantity);
         calculatedStats.totalAccruedInterest += accruedInterest;
-        
         // Calculate weighted average credit rate
         totalOpenRateWeighted += Number(trade.marginAmount) * roundedTotalCost;
         openPositionsValue += roundedTotalCost;
-        
         // Store upcoming trades data
         calculatedStats.upcomingTrades.push({
           symbol: trade.symbol,
@@ -266,65 +295,51 @@ function Statistics() {
       } else {
         // Closed trade
         calculatedStats.totalTradesClosed += 1;
-        
         if (trade.exitPrice) {
           const profit = (Number(trade.exitPrice) - Number(trade.entryPrice)) * Number(trade.quantity);
           const roundedProfit = Math.round(profit * 100) / 100;
           calculatedStats.totalProfit += roundedProfit;
-          
           // For ROI calculation
           totalAmountInvested += roundedTotalCost;
-          
           // Profit by symbol
           calculatedStats.profitBySymbol[trade.symbol] = (calculatedStats.profitBySymbol[trade.symbol] || 0) + roundedProfit;
-          
           // Monthly profits
           const exitMonth = format(parseDateLocal(trade.exitDate), 'yyyy-MM');
           calculatedStats.monthlyProfits[exitMonth] = (calculatedStats.monthlyProfits[exitMonth] || 0) + roundedProfit;
-          
           // Monthly interests
           calculatedStats.monthlyInterests[exitMonth] = (calculatedStats.monthlyInterests[exitMonth] || 0) + roundedDailyInterest * 30;
-          
           if (trade.entryDate && trade.exitDate) {
             const entryDate = parseDateLocal(trade.entryDate);
             const exitDate = parseDateLocal(trade.exitDate);
             const daysHeldClosed = Math.max(1, Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24)));
-            
-            // Calculate interest for closed trade (for reference)
-            const interestForPeriod = dailyInterest * daysHeldClosed;
+            // Calculate interest for closed trade using new utility
+            const interestForPeriod = calculateAccumulatedInterest(trade, rateChanges);
             const roundedInterestForPeriod = Math.round(interestForPeriod * 100) / 100;
             totalClosedInterest += roundedInterestForPeriod;
-            
             // Add to holding periods stats
             retentionPeriods.push(daysHeldClosed);
-            
             // Add return percentage for Sharpe ratio
             const returnPercentage = roundedProfit / roundedTotalCost;
             portfolioReturns.push(returnPercentage);
-            
             // Calculate weighted average credit rate
             totalRateWeighted += Number(trade.marginAmount) * roundedTotalCost;
           }
         }
       }
     });
-    
     // Store total interest paid for closed trades (for reference)
     calculatedStats.totalInterestPaid = totalClosedInterest;
     calculatedStats.totalAccruedInterest = Math.round(calculatedStats.totalAccruedInterest * 100) / 100;
-    
     // Calculate average credit rate
     if (openPositionsValue > 0) {
       calculatedStats.avgCreditRate = Math.round((totalOpenRateWeighted / openPositionsValue) * 100) / 100;
     } else if (totalAmountInvested > 0) {
       calculatedStats.avgCreditRate = Math.round((totalRateWeighted / totalAmountInvested) * 100) / 100;
     }
-    
     // Calculate ROI
     if (totalAmountInvested > 0) {
       calculatedStats.roi = Math.round((calculatedStats.totalProfit / totalAmountInvested) * 10000) / 100;
     }
-    
     // Calculate value at risk (simplified)
     if (portfolioReturns.length > 0) {
       // Sort returns in ascending order
@@ -334,14 +349,12 @@ function Statistics() {
       if (varIndex < sortedReturns.length) {
         calculatedStats.valueAtRisk = Math.round(Math.abs(sortedReturns[varIndex]) * calculatedStats.totalCostOpen * 100) / 100;
       }
-      
       // Calculate expected shortfall (average of returns below VaR)
       const belowVarReturns = sortedReturns.slice(0, varIndex + 1);
       if (belowVarReturns.length > 0) {
         const avgBelowVar = belowVarReturns.reduce((sum, val) => sum + val, 0) / belowVarReturns.length;
         calculatedStats.expectedShortfall = Math.round(Math.abs(avgBelowVar) * calculatedStats.totalCostOpen * 100) / 100;
       }
-      
       // Calculate Sharpe ratio (simplified)
       if (portfolioReturns.length > 1) {
         const avgReturn = portfolioReturns.reduce((sum, val) => sum + val, 0) / portfolioReturns.length;
@@ -352,10 +365,8 @@ function Statistics() {
         }
       }
     }
-    
     // Calculate maximum drawdown (simplified)
     calculatedStats.maxDrawdown = Math.round(calculatedStats.totalCostOpen * 0.15 * 100) / 100; // Example: 15% of current portfolio
-    
     // Process holding periods
     if (retentionPeriods.length > 0) {
       // Group by duration range
@@ -365,61 +376,49 @@ function Statistics() {
         '31-90': 0,
         '91+': 0
       };
-      
       retentionPeriods.forEach(days => {
         if (days <= 7) periods['1-7']++;
         else if (days <= 30) periods['8-30']++;
         else if (days <= 90) periods['31-90']++;
         else periods['91+']++;
       });
-      
       calculatedStats.holdingPeriods['closed'] = periods;
     }
-    
     // Sort upcoming trades by accrued interest (most expensive first)
     calculatedStats.upcomingTrades.sort((a, b) => (b.dailyInterest * b.daysHeld) - (a.dailyInterest * a.daysHeld));
     // Limit to top 5
     calculatedStats.upcomingTrades = calculatedStats.upcomingTrades.slice(0, 5);
-    
     // Set calculated stats
     setStats(calculatedStats);
-    
     // Сразу же рассчитываем потенциальную прибыль, если есть курсы
     if (Object.keys(stockPrices).length > 0) {
       calculatePotentialProfit(tradesData, stockPrices);
     }
   };
-
   // Функция расчета потенциальной прибыли
   const calculatePotentialProfit = (tradesData, prices = stockPrices) => {
     console.log("DEBUG calculatePotentialProfit: Начат расчет потенциальной прибыли");
     console.log("DEBUG calculatePotentialProfit: Цены акций:", JSON.stringify(prices));
     console.log("DEBUG calculatePotentialProfit: Количество сделок:", tradesData.length);
-    
     // Проверяем наличие курсов акций
     if (!prices || Object.keys(prices).length === 0) {
       console.warn("DEBUG calculatePotentialProfit: Нет сохраненных курсов для расчета потенциальной прибыли");
       return;
     }
-    
     // Проверим, что есть хотя бы один валидный курс
     const hasValidPrices = Object.values(prices).some(price => 
       typeof price === 'number' && !isNaN(price) && price > 0
     );
-    
     if (!hasValidPrices) {
       console.warn("DEBUG calculatePotentialProfit: Нет валидных курсов для расчета потенциальной прибыли");
       return;
     }
-    
     let totalPotentialProfit = 0;
     let totalPotentialProfitAfterInterest = 0;
     const today = new Date();
-    
     // Расчет только для открытых сделок
     const openTrades = tradesData.filter(trade => !trade.exitDate);
     console.log("DEBUG calculatePotentialProfit: Открытые сделки для расчета:", openTrades.length);
-    
     // Подробная информация о каждой открытой сделке
     openTrades.forEach((trade, index) => {
       console.log(`DEBUG calculatePotentialProfit: Сделка ${index + 1}:`, {
@@ -430,9 +429,7 @@ function Statistics() {
         currentPrice: prices[trade.symbol] || 'нет курса'
       });
     });
-    
     let calculatedTrades = 0;
-    
     for (const trade of openTrades) {
       try {
         // Проверяем наличие курса для данной акции и его корректность
@@ -440,27 +437,21 @@ function Statistics() {
           console.warn(`DEBUG calculatePotentialProfit: Нет курса для акции ${trade.symbol}`);
           continue;
         }
-        
         if (isNaN(parseFloat(prices[trade.symbol])) || parseFloat(prices[trade.symbol]) <= 0) {
           console.warn(`DEBUG calculatePotentialProfit: Некорректный курс для акции ${trade.symbol}. Значение: ${prices[trade.symbol]}`);
           continue;
         }
-        
         const rate = parseFloat(prices[trade.symbol]);
         const entryPrice = Number(trade.entryPrice);
         const quantity = Number(trade.quantity);
-        
         // Проверка корректности входных данных
         if (isNaN(entryPrice) || isNaN(quantity) || entryPrice <= 0 || quantity <= 0) {
           console.warn(`DEBUG calculatePotentialProfit: Некорректные данные для сделки по ${trade.symbol}: цена=${entryPrice}, количество=${quantity}`);
           continue;
         }
-        
         const totalCost = entryPrice * quantity;
-        
         // Расчет потенциальной прибыли
         const potentialProfit = (rate - entryPrice) * quantity;
-        
         // Расчет накопленных процентов
         let accumulatedInterest = 0;
         try {
@@ -476,39 +467,31 @@ function Statistics() {
         } catch (e) {
           console.error(`DEBUG calculatePotentialProfit: Ошибка при расчете процентов для ${trade.symbol}:`, e);
         }
-        
         // Потенциальная прибыль после вычета процентов
         const profitAfterInterest = potentialProfit - accumulatedInterest;
-        
         totalPotentialProfit += potentialProfit;
         totalPotentialProfitAfterInterest += profitAfterInterest;
-        
         calculatedTrades++;
         console.log(`DEBUG calculatePotentialProfit: Расчет для ${trade.symbol}: курс=${rate}, вход=${entryPrice}, прибыль=${potentialProfit.toFixed(2)}, проценты=${accumulatedInterest.toFixed(2)}`);
       } catch (error) {
         console.error(`DEBUG calculatePotentialProfit: Ошибка при расчете для ${trade.symbol}:`, error);
       }
     }
-    
     console.log(`DEBUG calculatePotentialProfit: Рассчитано ${calculatedTrades} сделок из ${openTrades.length} открытых`);
-    
     // Если не удалось рассчитать ни одной сделки, завершаем
     if (calculatedTrades === 0) {
       console.warn("DEBUG calculatePotentialProfit: Не удалось рассчитать потенциальную прибыль ни для одной сделки");
       return;
     }
-    
     // Рассчитываем общую прибыль с учетом закрытых сделок и потенциальной прибыли открытых
     const totalOverallProfit = (stats.totalProfit || 0) + totalPotentialProfit;
     const totalOverallProfitAfterInterest = (stats.totalProfit || 0) + totalPotentialProfitAfterInterest;
-    
     console.log("DEBUG calculatePotentialProfit: Итоговые расчеты:", {
       potentialProfit: totalPotentialProfit.toFixed(2),
       potentialProfitAfterInterest: totalPotentialProfitAfterInterest.toFixed(2),
       totalOverallProfit: totalOverallProfit.toFixed(2),
       totalOverallProfitAfterInterest: totalOverallProfitAfterInterest.toFixed(2)
     });
-    
     // Обновляем состояние
     setStats(prevStats => ({
       ...prevStats,
@@ -518,100 +501,88 @@ function Statistics() {
       totalOverallProfitAfterInterest
     }));
   };
-
   // Filter trades based on selected stock and active tab
   const getFilteredTrades = () => {
     return trades.filter(trade => 
       selectedStock === 'all' || trade.symbol === selectedStock
     );
   };
-
   // Get unique stock symbols from trades
   useEffect(() => {
     if (trades.length > 0) {
       const symbols = [...new Set(trades.map(trade => trade.symbol))].sort();
       setAvailableStocks(symbols);
-      
       // When switching to specific stock, recalculate stats
       calculateStats(getFilteredTrades());
     }
   }, [trades, selectedStock]);
-
   const handleStockChange = (stock) => {
     setSelectedStock(stock);
-    
     // Recalculate stats for the selected stock
     calculateStats(trades.filter(trade => 
       stock === 'all' || trade.symbol === stock
     ));
   };
-
   // Calculate stock-specific metrics
   const calculateStockMetrics = (stock) => {
     const stockTrades = trades.filter(t => t.symbol === stock);
-    
     if (stockTrades.length === 0) return null;
-    
     const today = new Date();
     const openTrades = stockTrades.filter(t => !t.exitDate);
     const closedTrades = stockTrades.filter(t => t.exitDate);
-    
     const totalQuantity = stockTrades.reduce((sum, t) => sum + Number(t.quantity), 0);
     const totalOpenQuantity = openTrades.reduce((sum, t) => sum + Number(t.quantity), 0);
-    
     const avgEntryPrice = openTrades.length > 0
       ? openTrades.reduce((sum, t) => sum + (Number(t.entryPrice) * Number(t.quantity)), 0) / 
         openTrades.reduce((sum, t) => sum + Number(t.quantity), 0)
       : 0;
-    
+    // Calculate average entry price INCLUDING accumulated interest costs using the same utility
+    let avgEntryPriceWithInterest = 0;
+    if (openTrades.length > 0) {
+      let totalCostWithInterest = 0;
+      let totalQuantityWithInterest = 0;
+      openTrades.forEach(trade => {
+        const entryPrice = Number(trade.entryPrice);
+        const quantity = Number(trade.quantity);
+        const totalCost = entryPrice * quantity;
+        // Use the same utility function for consistency
+        const accumulatedInterest = calculateAccumulatedInterest(trade, rateChanges);
+        // Add interest cost to the entry price per share
+        const entryPriceWithInterest = (totalCost + accumulatedInterest) / quantity;
+        totalCostWithInterest += entryPriceWithInterest * quantity;
+        totalQuantityWithInterest += quantity;
+      });
+      avgEntryPriceWithInterest = totalQuantityWithInterest > 0 
+        ? totalCostWithInterest / totalQuantityWithInterest 
+        : 0;
+    }
     const totalInvested = openTrades.reduce((sum, t) => 
       sum + (Number(t.entryPrice) * Number(t.quantity)), 0);
-    
     const currentPrice = stockPrices[stock] || 0;
     const currentValue = currentPrice * totalOpenQuantity;
-    
     const totalProfit = closedTrades.reduce((sum, t) => 
       sum + ((Number(t.exitPrice) - Number(t.entryPrice)) * Number(t.quantity)), 0);
-    
     const potentialProfit = currentPrice > 0
       ? (currentPrice - avgEntryPrice) * totalOpenQuantity
       : 0;
-    
-    // Calculate accumulated interest only for open trades (this is what we currently owe)
+    // Calculate accumulated interest only for open trades using the same utility
     let accumulatedInterest = 0;
-    
     openTrades.forEach(trade => {
-      const totalCost = Number(trade.entryPrice) * Number(trade.quantity);
-      const dailyInterest = totalCost * Number(trade.marginAmount) / 100 / 365;
-      const entryDate = parseDateLocal(trade.entryDate);
-      if (entryDate) {
-        const daysHeld = Math.max(1, Math.ceil((today - entryDate) / (1000 * 60 * 60 * 24)));
-        accumulatedInterest += dailyInterest * daysHeld;
-      }
+      accumulatedInterest += calculateAccumulatedInterest(trade, rateChanges);
     });
-    
-    // Calculate total interest paid for closed trades (for reference only)
+    // Calculate total interest paid for closed trades using the same utility
     let totalInterestPaid = 0;
     closedTrades.forEach(trade => {
       if (trade.entryDate && trade.exitDate) {
-        const totalCost = Number(trade.entryPrice) * Number(trade.quantity);
-        const dailyInterest = totalCost * Number(trade.marginAmount) / 100 / 365;
-        const entryDate = parseDateLocal(trade.entryDate);
-        const exitDate = parseDateLocal(trade.exitDate);
-        if (entryDate && exitDate) {
-          const daysHeld = Math.max(1, Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24)));
-          totalInterestPaid += dailyInterest * daysHeld;
-        }
+        totalInterestPaid += calculateAccumulatedInterest(trade, rateChanges);
       }
     });
-    
     // Profit calculations:
     // totalProfit - this already accounts for all costs including interest for closed trades
     // potentialProfitAfterInterest - subtract only accumulated interest for open positions
     // overallProfitAfterInterest - sum of above two values
     const potentialProfitAfterInterest = potentialProfit - accumulatedInterest;
     const overallProfitAfterInterest = totalProfit + potentialProfitAfterInterest;
-    
     return {
       symbol: stock,
       totalTrades: stockTrades.length,
@@ -620,6 +591,7 @@ function Statistics() {
       totalQuantity,
       totalOpenQuantity,
       avgEntryPrice,
+      avgEntryPriceWithInterest,
       totalInvested,
       currentPrice,
       currentValue,
@@ -632,18 +604,15 @@ function Statistics() {
       overallProfitAfterInterest
     };
   };
-
   // Generate PDF Report
   const generatePDFReport = async (stocksToInclude = null) => {
     try {
       // Определяем, какие акции включить в отчет
       const stocksForReport = stocksToInclude || (selectedStock === 'all' ? ['all'] : [selectedStock]);
-      
       // Заголовок документа
       const reportTitle = stocksForReport.includes('all') || stocksForReport.length > 1
         ? 'Отчет по портфелю - Сводный' 
         : `Отчет по портфелю - ${stocksForReport[0]}`;
-      
       // Создаем структуру документа
       const docDefinition = {
         content: [
@@ -654,7 +623,6 @@ function Statistics() {
             alignment: 'center',
             margin: [0, 0, 0, 20]
           },
-          
           // Дата формирования
           {
             text: `Дата формирования: ${format(new Date(), 'd MMMM yyyy, HH:mm', { locale: ru })}`,
@@ -663,7 +631,6 @@ function Statistics() {
             margin: [0, 0, 0, 30]
           }
         ],
-        
         styles: {
           header: {
             fontSize: 18,
@@ -684,18 +651,15 @@ function Statistics() {
             color: 'black'
           }
         },
-        
         defaultStyle: {
           fontSize: 10
         }
       };
-      
       // Добавляем содержимое в зависимости от выбора акций
       if (stocksForReport.includes('all') || stocksForReport.length > 1) {
         // Общая сводка портфеля
         docDefinition.content.push(
           { text: 'Сводка портфеля', style: 'sectionHeader' },
-          
           // Таблица основных показателей
           {
             table: {
@@ -720,7 +684,6 @@ function Statistics() {
             layout: 'lightHorizontalLines',
             margin: [0, 0, 0, 20]
           },
-          
           // Активность
           { text: 'Активность', style: 'sectionHeader' },
           {
@@ -744,11 +707,9 @@ function Statistics() {
         // Отчет по конкретной акции
         const stock = stocksForReport[0];
         const stockData = calculateStockMetrics(stock);
-        
         if (stockData) {
           docDefinition.content.push(
             { text: `Портфель (${stock})`, style: 'sectionHeader' },
-            
             {
               table: {
                 widths: ['*', '*'],
@@ -776,13 +737,11 @@ function Statistics() {
           );
         }
       }
-      
       // Добавляем текущие курсы акций, если они есть
       if (Object.keys(stockPrices).length > 0) {
         const pricesToShow = stocksForReport.includes('all') 
           ? Object.entries(stockPrices)
           : Object.entries(stockPrices).filter(([symbol]) => stocksForReport.includes(symbol));
-        
         if (pricesToShow.length > 0) {
           docDefinition.content.push(
             { text: 'Текущие курсы акций', style: 'sectionHeader' },
@@ -804,25 +763,20 @@ function Statistics() {
           );
         }
       }
-      
       // Генерируем и скачиваем PDF
       const fileName = stocksForReport.includes('all') 
         ? `Отчет_портфель_общий_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.pdf`
         : stocksForReport.length === 1
         ? `Отчет_портфель_${stocksForReport[0]}_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.pdf`
         : `Отчет_портфель_выбранные_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.pdf`;
-      
       pdfMake.createPdf(docDefinition).download(fileName);
-      
       // Закрываем модальное окно
       setShowPDFOptions(false);
-      
     } catch (error) {
       console.error('Ошибка при создании PDF отчета:', error);
       setError('Не удалось создать PDF отчет. Попробуйте еще раз.');
     }
   };
-
   // Подготовка данных для графика прибыли по месяцам
   const prepareMonthlyProfitData = () => {
     const sortedMonths = Object.keys(stats.monthlyProfits).sort((a, b) => {
@@ -830,21 +784,17 @@ function Statistics() {
       const [yearB, monthB] = b.split('-').map(Number);
       return yearA === yearB ? monthA - monthB : yearA - yearB;
     });
-    
     // Расчет данных о процентах по месяцам, если их нет в данных
     // В данном случае, разница между прибылью и прибылью после процентов
     const calculateInterestByMonth = () => {
       const interestByMonth = {};
-      
       sortedMonths.forEach(month => {
         const monthlyProfit = typeof stats.monthlyProfits[month] === 'object' 
           ? stats.monthlyProfits[month].profit || 0
           : stats.monthlyProfits[month] || 0;
-          
         // Если есть данные о месячных процентах, используем их
         // В противном случае оцениваем как ~20% от прибыли для визуализации разницы
         let monthlyInterest = 0;
-        
         if (stats.monthlyInterests && stats.monthlyInterests[month]) {
           monthlyInterest = stats.monthlyInterests[month];
         } else if (stats.monthlyProfits[month] && typeof stats.monthlyProfits[month] === 'object' && 
@@ -855,46 +805,34 @@ function Statistics() {
           // Оценка процентов как ~15% от прибыли для демонстрации разницы
           monthlyInterest = Math.abs(monthlyProfit) * 0.15;
         }
-        
         interestByMonth[month] = monthlyInterest;
       });
-      
       return interestByMonth;
     };
-    
     const interestByMonth = calculateInterestByMonth();
-    
     // Получение данных прибыли
     const profits = sortedMonths.map(month => {
       if (!stats.monthlyProfits[month]) return 0;
-      
       if (typeof stats.monthlyProfits[month] === 'object') {
         return stats.monthlyProfits[month].profit || 0;
       }
-      
       return stats.monthlyProfits[month] || 0;
     });
-    
     // Получение данных прибыли после вычета процентов
     const profitsAfterInterest = sortedMonths.map(month => {
       if (!stats.monthlyProfits[month]) return 0;
-      
       if (typeof stats.monthlyProfits[month] === 'object' && 
           stats.monthlyProfits[month].hasOwnProperty('profitAfterInterest')) {
         return stats.monthlyProfits[month].profitAfterInterest;
       }
-      
       // Если нет данных о прибыли после процентов, вычисляем из прибыли и процентов
       const profit = typeof stats.monthlyProfits[month] === 'object' 
         ? stats.monthlyProfits[month].profit || 0 
         : stats.monthlyProfits[month] || 0;
-        
       return profit - interestByMonth[month];
     });
-    
     // Проверка на идентичность данных и внесение небольшой разницы для визуализации
     const areArraysIdentical = JSON.stringify(profits) === JSON.stringify(profitsAfterInterest);
-    
     if (areArraysIdentical && profits.some(profit => profit !== 0)) {
       // Если данные идентичны, но не все нули, добавляем искусственную разницу
       for (let i = 0; i < profitsAfterInterest.length; i++) {
@@ -903,7 +841,6 @@ function Statistics() {
         }
       }
     }
-    
     const datasets = [
       {
         label: 'Прибыль (без %)',
@@ -926,7 +863,6 @@ function Statistics() {
         categoryPercentage: 0.7,
       }
     ];
-    
     return {
       labels: sortedMonths.map(month => {
         const [year, monthNum] = month.split('-');
@@ -935,10 +871,8 @@ function Statistics() {
       datasets: datasets
     };
   };
-  
   const prepareProfitBySymbolData = () => {
     const symbols = Object.keys(stats.profitBySymbol);
-    
     return {
       labels: symbols,
       datasets: [
@@ -955,10 +889,8 @@ function Statistics() {
       ],
     };
   };
-  
   const prepareTradesBySymbolData = () => {
     const symbols = Object.keys(stats.symbolCounts);
-    
     return {
       labels: symbols,
       datasets: [
@@ -976,12 +908,9 @@ function Statistics() {
       ],
     };
   };
-  
   const prepareHoldingPeriodsData = () => {
     if (!stats.holdingPeriods.closed) return null;
-    
     const periods = stats.holdingPeriods.closed;
-    
     return {
       labels: Object.keys(periods),
       datasets: [
@@ -999,7 +928,6 @@ function Statistics() {
       ],
     };
   };
-  
   const prepareTradeStatusData = () => {
     return {
       labels: ['Открытые', 'Закрытые'],
@@ -1016,7 +944,6 @@ function Statistics() {
       ],
     };
   };
-
   // Подготовка данных для графика среднедневной прибыли
   const prepareDailyProfitData = () => {
     const sortedMonths = Object.keys(stats.monthlyProfits).sort((a, b) => {
@@ -1024,21 +951,17 @@ function Statistics() {
       const [yearB, monthB] = b.split('-').map(Number);
       return yearA === yearB ? monthA - monthB : yearA - yearB;
     });
-    
     // Вычисляем среднесуточную прибыль по месяцам
     const dailyProfits = sortedMonths.map(month => {
       const monthProfit = typeof stats.monthlyProfits[month] === 'object' 
         ? stats.monthlyProfits[month].profit || 0
         : stats.monthlyProfits[month] || 0;
-      
       // Количество дней в месяце 
       const [year, monthNum] = month.split('-').map(Number);
       const daysInMonth = new Date(year, monthNum, 0).getDate();
-      
       // Среднесуточный профит
       return monthProfit / daysInMonth;
     });
-    
     return {
       labels: sortedMonths.map(month => {
         const [year, monthNum] = month.split('-');
@@ -1057,7 +980,6 @@ function Statistics() {
       ]
     };
   };
-
   // Подготовка данных для графика эффективности инвестиций по месяцам (ROI)
   const prepareMonthlyROIData = () => {
     const sortedMonths = Object.keys(stats.monthlyProfits).sort((a, b) => {
@@ -1065,23 +987,19 @@ function Statistics() {
       const [yearB, monthB] = b.split('-').map(Number);
       return yearA === yearB ? monthA - monthB : yearA - yearB;
     });
-    
     // Оценочная сумма инвестиций по месяцам (предполагаем постоянное увеличение на 5%)
     let estimatedMonthlyInvestment = stats.totalCostOpen / (sortedMonths.length || 1);
     const investments = sortedMonths.map((_, index) => {
       const investment = estimatedMonthlyInvestment * (1 + 0.05 * index);
       return investment;
     });
-    
     // Расчет ROI по месяцам
     const monthlyROI = sortedMonths.map((month, index) => {
       const monthProfit = typeof stats.monthlyProfits[month] === 'object' 
         ? stats.monthlyProfits[month].profit || 0
         : stats.monthlyProfits[month] || 0;
-      
       return (monthProfit / investments[index]) * 100;
     });
-    
     return {
       labels: sortedMonths.map(month => {
         const [year, monthNum] = month.split('-');
@@ -1099,7 +1017,6 @@ function Statistics() {
       ]
     };
   };
-
   // Helper: prepare monthly profit data for a specific stock - улучшенная версия
   const prepareStockMonthlyProfitData = (symbol) => {
     const profitMap = {};
@@ -1109,7 +1026,6 @@ function Statistics() {
       profitMap[month] = (profitMap[month] || 0) + profit;
     });
     const months = Object.keys(profitMap).sort();
-    
     if (months.length === 0) {
       return {
         labels: ['Нет данных'],
@@ -1122,7 +1038,6 @@ function Statistics() {
         }]
       };
     }
-    
     return {
       labels: months.map(m => {
         const [year, mon] = m.split('-');
@@ -1139,13 +1054,11 @@ function Statistics() {
       }]
     };
   };
-
   // Helper: prepare open/closed status data for a specific stock - улучшенная версия
   const prepareStockStatusData = (symbol) => {
     const stockTrades = trades.filter(t => t.symbol === symbol);
     const openCount = stockTrades.filter(t => !t.exitDate).length;
     const closedCount = stockTrades.filter(t => t.exitDate).length;
-    
     if (openCount === 0 && closedCount === 0) {
       return {
         labels: ['Нет данных'],
@@ -1156,7 +1069,6 @@ function Statistics() {
         }]
       };
     }
-    
     return {
       labels: ['Открытые', 'Закрытые'],
       datasets: [{
@@ -1168,13 +1080,11 @@ function Statistics() {
       }]
     };
   };
-
   // Helper: prepare entry price over time data for a specific stock - улучшенная версия
   const prepareStockEntryPriceData = (symbol) => {
     const stockTrades = trades.filter(t => t.symbol === symbol).sort((a, b) => 
       new Date(a.entryDate) - new Date(b.entryDate)
     );
-    
     if (stockTrades.length === 0) {
       return {
         labels: ['Нет данных'],
@@ -1187,33 +1097,27 @@ function Statistics() {
         }]
       };
     }
-    
     // Группируем цены по диапазонам для столбчатой диаграммы
     const prices = stockTrades.map(t => Number(t.entryPrice));
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     const range = maxPrice - minPrice;
-    
     // Создаем 5 диапазонов цен
     const rangeSize = range / 5;
     const ranges = [];
     const rangeCounts = [];
     const rangeColors = [];
-    
     for (let i = 0; i < 5; i++) {
       const rangeStart = minPrice + (rangeSize * i);
       const rangeEnd = minPrice + (rangeSize * (i + 1));
-      
       // Подсчитываем количество сделок в этом диапазоне
       const tradesInRange = prices.filter(price => 
         price >= rangeStart && (i === 4 ? price <= rangeEnd : price < rangeEnd)
       ).length;
-      
       ranges.push(`${rangeStart.toFixed(0)}-${rangeEnd.toFixed(0)}₽`);
       rangeCounts.push(tradesInRange);
       rangeColors.push(`rgba(124, 58, 237, ${0.4 + (tradesInRange / stockTrades.length) * 0.6})`);
     }
-    
     return {
       labels: ranges,
       datasets: [{
@@ -1226,7 +1130,6 @@ function Statistics() {
       }]
     };  
   };
-
   // Helper: prepare cumulative profit over time for a specific stock - более плоская и красивая версия
   const prepareStockCumulativeProfitData = (symbol) => {
     const closedTrades = trades
@@ -1236,7 +1139,6 @@ function Statistics() {
         profit: (Number(t.exitPrice) - Number(t.entryPrice)) * Number(t.quantity) 
       }))
       .sort((a, b) => a.date - b.date);
-    
     if (closedTrades.length === 0) {
       return {
         labels: ['Нет данных'],
@@ -1250,23 +1152,19 @@ function Statistics() {
         }]
       };
     }
-    
     let cumulative = 0;
     const labels = [];
     const data = [];
-    
     closedTrades.forEach(({ date, profit }, index) => {
       cumulative += profit;
       labels.push(`${index + 1}`);
       data.push(cumulative);
     });
-    
     // Определяем цвет линии в зависимости от итоговой прибыли
     const finalProfit = data[data.length - 1];
     const lineColor = finalProfit >= 0 ? CHART_COLORS.green : CHART_COLORS.red;
     const gradientColor = finalProfit >= 0 ? 
       'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
-    
     return {
       labels,
       datasets: [{
@@ -1285,7 +1183,6 @@ function Statistics() {
       }]
     };
   };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -1293,19 +1190,16 @@ function Statistics() {
       </div>
     );
   }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="p-6 max-w-6xl mx-auto">
         <h1 className="text-2xl font-medium text-gray-900 mb-8">Статистика торговли</h1>
-
         {/* Error message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
             {error}
           </div>
         )}
-
         {/* Stock Filter */}
         <div className="flex items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
@@ -1324,7 +1218,6 @@ function Statistics() {
               ))}
             </select>
           </div>
-          
           <div className="flex">
             <button
               onClick={() => generatePDFReport()}
@@ -1345,7 +1238,6 @@ function Statistics() {
             </button>
           </div>
         </div>
-
         {/* Saved stock prices info */}
         {Object.keys(stockPrices).length > 0 && (
           <div className="mb-8 p-4 bg-white border border-gray-200 rounded-lg text-sm">
@@ -1361,7 +1253,6 @@ function Statistics() {
             </div>
           </div>
         )}
-
         {/* Main statistics */}
         <div className="mb-8">
           {selectedStock === 'all' ? (
@@ -1387,7 +1278,6 @@ function Statistics() {
                         <span className="font-medium">{stats.avgCreditRate.toFixed(2)}%</span>
                       </div>
                     </div>
-                    
                     {/* Profit breakdown */}
                     <div className="border-t border-gray-100 pt-4">
                       <div className="text-sm font-medium text-gray-700 mb-3">Прибыль:</div>
@@ -1412,7 +1302,6 @@ function Statistics() {
                         </div>
                       </div>
                     </div>
-                    
                     {/* Interest costs */}
                     <div className="border-t border-gray-100 pt-4">
                       <div className="text-sm font-medium text-gray-700 mb-3">Проценты:</div>
@@ -1435,7 +1324,6 @@ function Statistics() {
                     </div>
                   </div>
                 </div>
-                
                 <div className="bg-white p-6 rounded-lg border border-gray-200">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Активность</h3>
                   <div className="space-y-4">
@@ -1454,7 +1342,6 @@ function Statistics() {
                         <span className="font-medium">{stats.totalTradesOpen + stats.totalTradesClosed}</span>
                       </div>
                     </div>
-
                     {/* Performance metrics */}
                     <div className="border-t border-gray-100 pt-4">
                       <div className="text-sm font-medium text-gray-700 mb-3">Эффективность:</div>
@@ -1485,13 +1372,11 @@ function Statistics() {
             <div>
               {(() => {
                 const stockData = calculateStockMetrics(selectedStock);
-                
                 if (!stockData) return (
                   <div className="bg-white p-6 rounded-lg border border-gray-200 text-center">
                     <p className="text-gray-500">Нет данных для выбранной акции</p>
                   </div>
                 );
-                
                 return (
                   <div>
                     {/* Detailed stats for specific stock */}
@@ -1514,7 +1399,6 @@ function Statistics() {
                               <span className="font-medium">{stockData.totalQuantity}</span>
                             </div>
                           </div>
-                          
                           {/* Profit breakdown */}
                           <div className="border-t border-gray-100 pt-4">
                             <div className="text-sm font-medium text-gray-700 mb-3">Прибыль:</div>
@@ -1539,7 +1423,6 @@ function Statistics() {
                               </div>
                             </div>
                           </div>
-                          
                           {/* Interest costs */}
                           <div className="border-t border-gray-100 pt-4">
                             <div className="text-sm font-medium text-gray-700 mb-3">Проценты:</div>
@@ -1562,7 +1445,6 @@ function Statistics() {
                           </div>
                         </div>
                       </div>
-
                       <div className="bg-white p-6 rounded-lg border border-gray-200">
                         <h3 className="text-lg font-medium text-gray-900 mb-4">Детали по {selectedStock}</h3>
                         <div className="space-y-4">
@@ -1571,6 +1453,10 @@ function Statistics() {
                             <div className="flex justify-between text-sm mb-2">
                               <span className="text-gray-600">Средняя цена входа</span>
                               <span className="font-medium">{stockData.avgEntryPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between text-sm mb-2">
+                              <span className="text-gray-600">Средняя цена входа с учётом процентов</span>
+                              <span className="font-medium text-orange-600">{stockData.avgEntryPriceWithInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
                             </div>
                             <div className="flex justify-between text-sm mb-2">
                               <span className="text-gray-600">Текущая цена</span>
@@ -1583,7 +1469,6 @@ function Statistics() {
                               <span className="font-medium">{stockData.currentValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
                             </div>
                           </div>
-                          
                           {/* Trading activity */}
                           <div className="border-t border-gray-100 pt-4">
                             <div className="text-sm font-medium text-gray-700 mb-3">Сделки:</div>
@@ -1608,7 +1493,6 @@ function Statistics() {
                   </div>
                 );
               })()}
-              
               {/* Stock-specific charts in minimalistic style */}
               <div className="space-y-6 mt-8">
                 {/* Monthly profit chart */}
@@ -1664,7 +1548,6 @@ function Statistics() {
                     />
                   </div>
                 </div>
-                
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Status chart */}
                   <div className="bg-white p-6 rounded-lg border border-gray-200">
@@ -1686,7 +1569,6 @@ function Statistics() {
                       />
                     </div>
                   </div>
-                  
                   {/* Price ranges chart */}
                   <div className="bg-white p-6 rounded-lg border border-gray-200">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Диапазоны цен входа</h3>
@@ -1715,7 +1597,6 @@ function Statistics() {
                       />
                     </div>
                   </div>
-                  
                   {/* Cumulative profit chart */}
                   <div className="bg-white p-6 rounded-lg border border-gray-200 lg:col-span-2">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Накопленная прибыль ({selectedStock})</h3>
@@ -1746,7 +1627,6 @@ function Statistics() {
             </div>
           )}
         </div>
-
         {/* Charts for all stocks */}
         {selectedStock === 'all' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1787,7 +1667,6 @@ function Statistics() {
                 </div>
               )}
             </div>
-            
             {/* Daily Profit Chart */}
             <div className="bg-white p-6 rounded-lg border border-gray-200">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Среднедневная прибыль</h3>
@@ -1819,7 +1698,6 @@ function Statistics() {
                 </div>
               )}
             </div>
-            
             {/* Trade Status Chart */}
             <div className="bg-white p-6 rounded-lg border border-gray-200 lg:col-span-2">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Статус позиций</h3>
@@ -1850,18 +1728,15 @@ function Statistics() {
           </div>
         )}
       </div>
-      
       {/* PDF Options Modal */}
       {showPDFOptions && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Настройки PDF отчета</h3>
-            
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">
                 Выберите акции для включения в отчет:
               </label>
-              
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 <label className="flex items-center">
                   <input
@@ -1878,7 +1753,6 @@ function Statistics() {
                   />
                   <span className="ml-2 text-sm text-gray-700 font-medium">Все акции (общий отчет)</span>
                 </label>
-                
                 <div className="pl-4 space-y-2">
                   {availableStocks.map(stock => (
                     <label key={stock} className="flex items-center">
@@ -1905,7 +1779,6 @@ function Statistics() {
                 </div>
               </div>
             </div>
-            
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => {
@@ -1934,5 +1807,4 @@ function Statistics() {
     </div>
   );
 }
-
 export default Statistics; 
