@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function StockAccounting() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Mock current prices for calculations
-  const mockPrices = {
-    'BA': 245.50,
-    'XLNX': 185.30,
-    'USD': 1.00
+  // Сохраняем курсы акций, введённые пользователем, из localStorage
+  const getSavedPrices = () => {
+    try {
+      return JSON.parse(localStorage.getItem('stockPrices')) || {};
+    } catch {
+      return {};
+    }
   };
+  const savedPrices = getSavedPrices();
 
   useEffect(() => {
     fetchTransactions();
@@ -18,8 +22,8 @@ function StockAccounting() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/spot-transactions');
-      const data = await response.json();
+      const response = await axios.get('/api/spot-transactions');
+      const data = response.data;
       setTransactions(data);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -65,7 +69,7 @@ function StockAccounting() {
     return Object.values(positions)
       .filter(pos => pos.shares > 0)
       .map(pos => {
-        const currentPrice = mockPrices[pos.ticker] || pos.avgPrice;
+        const currentPrice = savedPrices[pos.ticker] || pos.avgPrice;
         const currentValue = pos.shares * currentPrice;
         const unrealizedPL = currentValue - pos.totalCost;
         const unrealizedPercent = pos.totalCost > 0 ? (unrealizedPL / pos.totalCost) * 100 : 0;

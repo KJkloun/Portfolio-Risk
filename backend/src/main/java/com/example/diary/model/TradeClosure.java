@@ -16,7 +16,7 @@ public class TradeClosure {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "trade_id", nullable = false)
-    @JsonBackReference
+    @JsonBackReference("trade-closures")
     private Trade trade;
 
     @NotNull(message = "Закрываемое количество обязательно")

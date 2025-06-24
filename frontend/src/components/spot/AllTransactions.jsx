@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function AllTransactions() {
   const [transactions, setTransactions] = useState([]);
@@ -33,123 +34,26 @@ function AllTransactions() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/spot-transactions');
-      let apiTransactions = await response.json();
+      const response = await axios.get('/api/spot-transactions');
+      let apiTransactions = response.data;
 
-      // If no data, add initial data from Google Sheets
-      if (apiTransactions.length === 0) {
-        const initialData = [
-          {
-            company: 'USD',
-            ticker: 'USD',
-            transactionType: 'DEPOSIT',
-            price: 1.00,
-            quantity: 100000,
-            tradeDate: '2019-05-06',
-            note: 'Начальный депозит'
-          },
-          {
-            company: 'Boeing',
-            ticker: 'BA',
-            transactionType: 'BUY',
-            price: 365.17,
-            quantity: 272,
-            tradeDate: '2019-05-07',
-            note: ''
-          },
-          {
-            company: 'USD',
-            ticker: 'USD',
-            transactionType: 'DEPOSIT',
-            price: 1.00,
-            quantity: 51000,
-            tradeDate: '2019-05-08',
-            note: ''
-          },
-          {
-            company: 'Boeing',
-            ticker: 'BA',
-            transactionType: 'BUY',
-            price: 354.97,
-            quantity: 144,
-            tradeDate: '2019-05-08',
-            note: ''
-          },
-          {
-            company: 'Boeing',
-            ticker: 'BA',
-            transactionType: 'SELL',
-            price: 369.50,
-            quantity: 140,
-            tradeDate: '2019-06-18',
-            note: ''
-          },
-          {
-            company: 'Boeing',
-            ticker: 'BA',
-            transactionType: 'SELL',
-            price: 365.40,
-            quantity: 140,
-            tradeDate: '2019-06-18',
-            note: ''
-          },
-          {
-            company: 'Xilinx',
-            ticker: 'XLNX',
-            transactionType: 'BUY',
-            price: 120.98,
-            quantity: 860,
-            tradeDate: '2019-07-19',
-            note: ''
-          },
-          {
-            company: 'Boeing',
-            ticker: 'USD',
-            transactionType: 'DIVIDEND',
-            price: 1.00,
-            quantity: 243,
-            tradeDate: '2019-09-17',
-            note: 'Дивиденды Boeing'
-          },
-          {
-            company: 'Boeing',
-            ticker: 'BA',
-            transactionType: 'SELL',
-            price: 381.20,
-            quantity: 136,
-            tradeDate: '2019-09-17',
-            note: ''
-          },
-          {
-            company: 'Xilinx',
-            ticker: 'XLNX',
-            transactionType: 'BUY',
-            price: 98.07,
-            quantity: 532,
-            tradeDate: '2019-09-22',
-            note: ''
-          }
-        ];
-
-        // Add data through API
-        for (const tx of initialData) {
-          await fetch('http://localhost:8081/api/spot-transactions', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(tx),
-          });
-        }
-
-        // Get updated data
-        const updatedResponse = await fetch('http://localhost:8081/api/spot-transactions');
-        apiTransactions = await updatedResponse.json();
+      // Check if apiTransactions is an array, if not set empty array
+      if (!Array.isArray(apiTransactions)) {
+        console.warn('API returned non-array data:', apiTransactions);
+        apiTransactions = [];
       }
 
-      setTransactions(apiTransactions.sort((a, b) => new Date(b.tradeDate) - new Date(a.tradeDate)));
+      // Если портфель пуст – просто показываем пустой список без автозаполнения демо-данными
+
+      // Sort only if we have an array
+      if (Array.isArray(apiTransactions)) {
+        setTransactions(apiTransactions.sort((a, b) => new Date(b.tradeDate) - new Date(a.tradeDate)));
+      } else {
+        setTransactions([]);
+      }
     } catch (error) {
       console.error('Error fetching transactions:', error);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -158,19 +62,11 @@ function AllTransactions() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const url = editingTransaction 
-        ? `http://localhost:8081/api/spot-transactions/${editingTransaction.id}`
-        : 'http://localhost:8081/api/spot-transactions';
-      
-      const method = editingTransaction ? 'PUT' : 'POST';
-      
-      await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      if (editingTransaction) {
+        await axios.put(`/api/spot-transactions/${editingTransaction.id}`, formData);
+      } else {
+        await axios.post('/api/spot-transactions', formData);
+      }
 
       fetchTransactions();
       setShowForm(false);
@@ -206,9 +102,7 @@ function AllTransactions() {
   const handleDelete = async (id) => {
     if (window.confirm('Вы уверены, что хотите удалить эту транзакцию?')) {
       try {
-        await fetch(`http://localhost:8081/api/spot-transactions/${id}`, {
-          method: 'DELETE',
-        });
+        await axios.delete(`/api/spot-transactions/${id}`);
         fetchTransactions();
       } catch (error) {
         console.error('Error deleting transaction:', error);

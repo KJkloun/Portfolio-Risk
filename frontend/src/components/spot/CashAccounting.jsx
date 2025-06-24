@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function CashAccounting() {
   const [transactions, setTransactions] = useState([]);
@@ -11,8 +12,8 @@ function CashAccounting() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/spot-transactions');
-      const data = await response.json();
+      const response = await axios.get('/api/spot-transactions');
+      const data = response.data;
       
       // Sort by date, newest first
       const sortedData = data.sort((a, b) => new Date(b.tradeDate) - new Date(a.tradeDate));

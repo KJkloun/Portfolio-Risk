@@ -1,13 +1,15 @@
 package com.example.diary.controller;
 
-import com.example.diary.model.AppUser;
 import com.example.diary.model.Portfolio;
-import com.example.diary.repository.AppUserRepository;
-import com.example.diary.repository.PortfolioRepository;
+import com.example.diary.model.User;
+import com.example.diary.security.JwtUtil;
+import com.example.diary.service.PortfolioService;
+import com.example.diary.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -16,60 +18,152 @@ import java.util.Optional;
 @RequestMapping("/portfolios")
 @CrossOrigin(origins = "*")
 public class PortfolioController {
-
+    
     @Autowired
-    private PortfolioRepository portfolioRepository;
-
+    private PortfolioService portfolioService;
+    
     @Autowired
-    private AppUserRepository userRepository;
-
-    // Получить список портфелей пользователя
-    @GetMapping
-    public ResponseEntity<?> list(@RequestParam Long userId) {
-        Optional<AppUser> userOpt = userRepository.findById(userId);
-        if (userOpt.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "User not found"));
-        List<Portfolio> portfolios = portfolioRepository.findByUser(userOpt.get());
-        return ResponseEntity.ok(portfolios);
-    }
-
-    // Создать портфель
+    private UserService userService;
+    
+    @Autowired
+    private JwtUtil jwtUtil;
+    
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody Map<String, Object> body) {
-        Long userId = ((Number) body.get("userId")).longValue();
-        String name = (String) body.get("name");
-        String typeStr = (String) body.get("type");
-        if (userId == null || name == null || typeStr == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "userId, name and type required"));
+    public ResponseEntity<?> createPortfolio(@RequestBody CreatePortfolioRequest request, @RequestHeader("Authorization") String authHeader) {
+        try {
+            User user = getUserFromToken(authHeader);
+            
+            Portfolio portfolio = portfolioService.createPortfolio(
+                request.getName(),
+                Portfolio.PortfolioType.valueOf(request.getType()),
+                request.getCurrency(),
+                request.getDescription(),
+                user
+            );
+            
+            return ResponseEntity.ok(createPortfolioResponse(portfolio));
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
-        Optional<AppUser> userOpt = userRepository.findById(userId);
-        if (userOpt.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "User not found"));
-
-        Portfolio portfolio = new Portfolio();
-        portfolio.setName(name);
-        portfolio.setType(Portfolio.PortfolioType.valueOf(typeStr.toUpperCase()));
-        portfolio.setUser(userOpt.get());
-
-        Portfolio saved = portfolioRepository.save(portfolio);
-        return ResponseEntity.ok(saved);
     }
-
-    // Переименовать / изменить портфель
+    
+    @GetMapping
+    public ResponseEntity<?> getUserPortfolios(@RequestHeader("Authorization") String authHeader) {
+        try {
+            User user = getUserFromToken(authHeader);
+            List<Portfolio> portfolios = portfolioService.getUserPortfolios(user);
+            
+            return ResponseEntity.ok(portfolios.stream()
+                .map(this::createPortfolioResponse)
+                .toList());
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @GetMapping("/type/{type}")
+    public ResponseEntity<?> getUserPortfoliosByType(@PathVariable String type, @RequestHeader("Authorization") String authHeader) {
+        try {
+            User user = getUserFromToken(authHeader);
+            Portfolio.PortfolioType portfolioType = Portfolio.PortfolioType.valueOf(type.toUpperCase());
+            List<Portfolio> portfolios = portfolioService.getUserPortfoliosByType(user, portfolioType);
+            
+            return ResponseEntity.ok(portfolios.stream()
+                .map(this::createPortfolioResponse)
+                .toList());
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        Optional<Portfolio> portOpt = portfolioRepository.findById(id);
-        if (portOpt.isEmpty()) return ResponseEntity.notFound().build();
-        Portfolio p = portOpt.get();
-        if (body.containsKey("name")) p.setName((String) body.get("name"));
-        if (body.containsKey("type")) p.setType(Portfolio.PortfolioType.valueOf(((String) body.get("type")).toUpperCase()));
-        return ResponseEntity.ok(portfolioRepository.save(p));
+    public ResponseEntity<?> updatePortfolio(@PathVariable Long id, @RequestBody UpdatePortfolioRequest request, @RequestHeader("Authorization") String authHeader) {
+        try {
+            User user = getUserFromToken(authHeader);
+            Portfolio portfolio = portfolioService.updatePortfolio(id, request.getName(), request.getCurrency(), request.getDescription(), user);
+            
+            return ResponseEntity.ok(createPortfolioResponse(portfolio));
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
-
-    // Удалить портфель
+    
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> delete(@PathVariable Long id) {
-        Optional<Portfolio> portOpt = portfolioRepository.findById(id);
-        if (portOpt.isEmpty()) return ResponseEntity.notFound().build();
-        portfolioRepository.delete(portOpt.get());
-        return ResponseEntity.ok().build();
+    public ResponseEntity<?> deactivatePortfolio(@PathVariable Long id, @RequestHeader("Authorization") String authHeader) {
+        try {
+            User user = getUserFromToken(authHeader);
+            portfolioService.deactivatePortfolio(id, user);
+            
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Портфель деактивирован");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    private User getUserFromToken(String authHeader) {
+        String token = authHeader.replace("Bearer ", "");
+        String username = jwtUtil.extractUsername(token);
+        Optional<User> userOpt = userService.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            throw new RuntimeException("Пользователь не найден");
+        }
+        return userOpt.get();
+    }
+    
+    private Map<String, Object> createPortfolioResponse(Portfolio portfolio) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", portfolio.getId());
+        response.put("name", portfolio.getName());
+        response.put("type", portfolio.getType().name());
+        response.put("typeDisplay", portfolio.getType().getDisplayName());
+        response.put("currency", portfolio.getCurrency());
+        response.put("description", portfolio.getDescription());
+        response.put("isActive", portfolio.getIsActive());
+        response.put("createdAt", portfolio.getCreatedAt());
+        return response;
+    }
+    
+    public static class CreatePortfolioRequest {
+        private String name;
+        private String type;
+        private String currency = "RUB";
+        private String description;
+        
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getType() { return type; }
+        public void setType(String type) { this.type = type; }
+        public String getCurrency() { return currency; }
+        public void setCurrency(String currency) { this.currency = currency; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+    }
+    
+    public static class UpdatePortfolioRequest {
+        private String name;
+        private String currency;
+        private String description;
+        
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getCurrency() { return currency; }
+        public void setCurrency(String currency) { this.currency = currency; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
     }
 } 
+ 
+ 
+ 

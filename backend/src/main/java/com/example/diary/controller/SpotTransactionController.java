@@ -3,6 +3,7 @@ package com.example.diary.controller;
 import com.example.diary.model.SpotTransaction;
 import com.example.diary.model.Portfolio;
 import com.example.diary.repository.SpotTransactionRepository;
+import com.example.diary.repository.PortfolioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,28 +19,25 @@ public class SpotTransactionController {
 
     @Autowired
     private SpotTransactionRepository repository;
+    
+    @Autowired
+    private PortfolioRepository portfolioRepository;
 
     // Получить все транзакции
     @GetMapping
-    public List<SpotTransaction> getAllTransactions(@RequestParam(required = false) Long portfolioId) {
-        if (portfolioId == null) {
-            return repository.findAll();
+    public List<SpotTransaction> getAllTransactions(@RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
+        if (portfolioId != null) {
+            return repository.findByPortfolioId(portfolioId);
         }
-        return repository.findAll().stream()
-                .filter(tx -> tx.getPortfolio() != null && tx.getPortfolio().getId().equals(portfolioId))
-                .collect(Collectors.toList());
+        return repository.findAll();
     }
 
     // Создать новую транзакцию
     @PostMapping
-    public SpotTransaction createTransaction(
-            @RequestBody SpotTransaction transaction,
-            @RequestParam(required = false) Long portfolioId) {
+    public SpotTransaction createTransaction(@RequestBody SpotTransaction transaction, @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         if (portfolioId != null) {
-            // Ленивая загрузка портфеля через EntityManager не нужна - создадим заглушку с id
-            Portfolio p = new Portfolio();
-            p.setId(portfolioId);
-            transaction.setPortfolio(p);
+            Portfolio portfolio = portfolioRepository.findById(portfolioId).orElse(null);
+            transaction.setPortfolio(portfolio);
         }
         return repository.save(transaction);
     }
@@ -82,8 +80,13 @@ public class SpotTransactionController {
 
     // Получить портфель (текущие позиции)
     @GetMapping("/portfolio")
-    public Map<String, Object> getPortfolio() {
-        List<SpotTransaction> transactions = repository.findAll();
+    public Map<String, Object> getPortfolio(@RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
+        List<SpotTransaction> transactions;
+        if (portfolioId != null) {
+            transactions = repository.findByPortfolioId(portfolioId);
+        } else {
+            transactions = repository.findAll();
+        }
         
         // Группируем по тикерам
         Map<String, List<SpotTransaction>> byTicker = transactions.stream()
@@ -208,7 +211,10 @@ public class SpotTransactionController {
 
     // Получить транзакции по тикеру
     @GetMapping("/by-ticker/{ticker}")
-    public List<SpotTransaction> getTransactionsByTicker(@PathVariable String ticker) {
+    public List<SpotTransaction> getTransactionsByTicker(@PathVariable String ticker, @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
+        if (portfolioId != null) {
+            return repository.findByPortfolioIdAndTickerOrderByTradeDateDesc(portfolioId, ticker);
+        }
         return repository.findByTickerOrderByTradeDateDesc(ticker);
     }
 

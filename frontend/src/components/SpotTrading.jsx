@@ -10,6 +10,7 @@ import CurrentProfit from './spot/CurrentProfit';
 import DailySummary from './spot/DailySummary';
 import TickerDetails from './spot/TickerDetails';
 import FifoAnalysis from './spot/FifoAnalysis';
+import SpotStockPrices from './spot/StockPrices';
 
 function SpotTrading() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -68,6 +69,13 @@ function SpotTrading() {
                 : 'text-gray-600 hover:text-[#9333ea]'
             }>
               Итог на день
+            </NavLink>
+            <NavLink to="/spot/stock-prices" className={({isActive}) => 
+              isActive 
+                ? 'text-[#9333ea] font-medium' 
+                : 'text-gray-600 hover:text-[#9333ea]'
+            }>
+              Курсы акций
             </NavLink>
           </div>
           <div className="sm:hidden">
@@ -129,6 +137,13 @@ function SpotTrading() {
               }>
                 Итог на день
               </NavLink>
+              <NavLink to="/spot/stock-prices" className={({isActive}) => 
+                isActive 
+                  ? 'block px-3 py-2 text-[#9333ea] font-medium' 
+                  : 'block px-3 py-2 text-gray-600 hover:text-[#9333ea]'
+              }>
+                Курсы акций
+              </NavLink>
             </div>
           </div>
         )}
@@ -145,6 +160,7 @@ function SpotTrading() {
           <Route path="/stock-accounting" element={<StockAccounting />} />
           <Route path="/current-profit" element={<CurrentProfit />} />
           <Route path="/daily-summary" element={<DailySummary />} />
+          <Route path="/stock-prices" element={<SpotStockPrices />} />
           <Route path="/ticker/:ticker" element={<TickerDetails />} />
         </Routes>
       </main>

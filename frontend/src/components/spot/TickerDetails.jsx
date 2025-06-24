@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import axios from 'axios';
 
 function TickerDetails() {
   const { ticker } = useParams();
@@ -14,8 +15,8 @@ function TickerDetails() {
   const fetchTickerDetails = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/spot-transactions');
-      const allTransactions = await response.json();
+      const response = await axios.get('/api/spot-transactions');
+      const allTransactions = response.data;
       
       // Filter transactions for this ticker
       const tickerTransactions = allTransactions
@@ -53,15 +54,15 @@ function TickerDetails() {
         averageSellPrice = totalRevenue / totalSold;
       }
       
-      // Mock current price
-      const mockPrices = {
-        'BA': 250.00,
-        'XLNX': 150.00,
-        'BTCUSD': 45000.00,
-        'USD': 1.00
-      };
+      // Текущая цена берётся из сохранённых курсов или из средней цены покупки, если курс не задан
+      let currentPrice = averageBuyPrice;
+      try {
+        const saved = JSON.parse(localStorage.getItem('stockPrices')) || {};
+        if (saved[ticker]) {
+          currentPrice = saved[ticker];
+        }
+      } catch {}
       
-      const currentPrice = mockPrices[ticker] || averageBuyPrice;
       const currentValue = totalQuantity * currentPrice;
       const realizedPnL = totalRevenue - (totalSold * averageBuyPrice);
       const unrealizedPnL = totalQuantity > 0 ? currentValue - (totalQuantity * averageBuyPrice) : 0;

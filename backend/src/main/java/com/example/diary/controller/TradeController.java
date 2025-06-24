@@ -19,7 +19,6 @@ import java.math.BigDecimal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.temporal.ChronoUnit;
-import com.example.diary.model.Portfolio;
 
 @RestController
 @RequestMapping("/trades")
@@ -34,32 +33,26 @@ public class TradeController {
     @Autowired
     private TradeClosureRepository tradeClosureRepository;
 
+    @Autowired
+    private com.example.diary.repository.PortfolioRepository portfolioRepository;
+
     @GetMapping
-    public ResponseEntity<List<Trade>> getAllTrades(@RequestParam(required = false) Long portfolioId) {
-        List<Trade> trades = tradeRepository.findAll();
-        if (portfolioId != null) {
-            trades = trades.stream()
-                    .filter(t -> t.getPortfolio() != null && t.getPortfolio().getId().equals(portfolioId))
-                    .collect(Collectors.toList());
-        }
+    public ResponseEntity<List<Trade>> getAllTrades(@RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
+        List<Trade> trades = (portfolioId != null)
+                ? tradeRepository.findByPortfolioId(portfolioId)
+                : tradeRepository.findAll();
         return ResponseEntity.ok(trades);
     }
 
     @PostMapping("/buy")
-    public ResponseEntity<?> buyTrade(@RequestBody Trade trade, @RequestParam(required = false) Long portfolioId) {
+    public ResponseEntity<?> buyTrade(@RequestBody Trade trade,
+                                      @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         try {
             logger.info("Получен запрос на покупку: {}", trade);
             
             // Используем дату из запроса, если она не указана - используем текущую
             if (trade.getEntryDate() == null) {
                 trade.setEntryDate(LocalDate.now());
-            }
-            
-            // Связываем с портфелем, если указан
-            if (portfolioId != null) {
-                Portfolio p = new Portfolio();
-                p.setId(portfolioId);
-                trade.setPortfolio(p);
             }
             
             // Проверка, что необходимые поля не null
@@ -86,6 +79,11 @@ public class TradeController {
 
             if (!(trade.getMarginAmount() instanceof BigDecimal)) {
                 trade.setMarginAmount(BigDecimal.valueOf(trade.getMarginAmount().doubleValue()));
+            }
+            
+            // Привязываем к портфелю
+            if (portfolioId != null) {
+                trade.setPortfolio(portfolioRepository.findById(portfolioId).orElse(null));
             }
             
             // Рассчитываем проценты по кредиту
@@ -120,7 +118,8 @@ public class TradeController {
     }
 
     @PostMapping("/bulk-import")
-    public ResponseEntity<?> bulkImportTrades(@RequestBody Map<String, List<Map<String, Object>>> request) {
+    public ResponseEntity<?> bulkImportTrades(@RequestBody Map<String, List<Map<String, Object>>> request,
+                                              @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         try {
             logger.info("Получен запрос на массовый импорт сделок");
 
@@ -231,6 +230,11 @@ public class TradeController {
                         }
                     }
 
+                    // Привязываем к портфелю
+                    if (portfolioId != null) {
+                        trade.setPortfolio(portfolioRepository.findById(portfolioId).orElse(null));
+                    }
+
                     // Сохраняем сделку
                     Trade savedTrade = tradeRepository.save(trade);
                     savedTrades.add(savedTrade);
@@ -269,10 +273,15 @@ public class TradeController {
     @PostMapping("/{id}/sell")
     public ResponseEntity<?> sellTrade(
             @PathVariable Long id,
-            @RequestParam Double exitPrice) {
+            @RequestParam Double exitPrice,
+            @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         try {
             Trade trade = tradeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Сделка не найдена"));
+
+            if (portfolioId != null && !trade.getPortfolio().getId().equals(portfolioId)) {
+                return ResponseEntity.status(403).body(Map.of("message", "Trade does not belong to portfolio"));
+            }
 
             trade.setExitPrice(BigDecimal.valueOf(exitPrice));
             trade.setExitDate(LocalDate.now());
@@ -315,18 +324,28 @@ public class TradeController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getTrade(@PathVariable Long id) {
+    public ResponseEntity<?> getTrade(@PathVariable Long id,
+                                                @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         return tradeRepository.findById(id)
-            .map(ResponseEntity::ok)
+            .map(trade -> {
+                if (portfolioId != null && !trade.getPortfolio().getId().equals(portfolioId)) {
+                    return ResponseEntity.status(403).build();
+                }
+                return ResponseEntity.ok().body(trade);
+            })
             .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteTrade(@PathVariable Long id) {
+    public ResponseEntity<?> deleteTrade(@PathVariable Long id,
+                                         @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         if (!tradeRepository.existsById(id)) {
             return ResponseEntity.notFound().build();
         }
         try {
+            if (portfolioId != null && !tradeRepository.findById(id).get().getPortfolio().getId().equals(portfolioId)) {
+                return ResponseEntity.status(403).build();
+            }
             tradeRepository.deleteById(id);
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -341,9 +360,10 @@ public class TradeController {
     @GetMapping("/analytics/summary")
     public ResponseEntity<?> getAnalyticsSummary(
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
+            @RequestParam(required = false) String endDate,
+            @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         
-        List<Trade> allTrades = tradeRepository.findAll();
+        List<Trade> allTrades = (portfolioId != null) ? tradeRepository.findByPortfolioId(portfolioId) : tradeRepository.findAll();
         
         // Фильтрация по дате, если указаны параметры
         if (startDate != null || endDate != null) {
@@ -399,9 +419,10 @@ public class TradeController {
     @GetMapping("/analytics/monthly")
     public ResponseEntity<?> getMonthlyAnalytics(
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
+            @RequestParam(required = false) String endDate,
+            @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         
-        List<Trade> allTrades = tradeRepository.findAll();
+        List<Trade> allTrades = (portfolioId != null) ? tradeRepository.findByPortfolioId(portfolioId) : tradeRepository.findAll();
         
         // Фильтрация по дате, если указаны параметры
         LocalDate start = startDate != null ? 
@@ -454,9 +475,10 @@ public class TradeController {
     @GetMapping("/analytics/symbols")
     public ResponseEntity<?> getSymbolAnalytics(
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
+            @RequestParam(required = false) String endDate,
+            @RequestHeader(value = "X-Portfolio-ID", required = false) Long portfolioId) {
         
-        List<Trade> allTrades = tradeRepository.findAll();
+        List<Trade> allTrades = (portfolioId != null) ? tradeRepository.findByPortfolioId(portfolioId) : tradeRepository.findAll();
         
         // Фильтрация по дате, если указаны параметры
         if (startDate != null || endDate != null) {

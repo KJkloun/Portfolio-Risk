@@ -1,70 +1,114 @@
-import { useState, useContext } from 'react';
-import { AuthContext } from '../contexts/AuthContext';
+import { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 
-export default function Login() {
-  const { login, register } = useContext(AuthContext);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [mode, setMode] = useState('login'); // or 'register'
-  const [error, setError] = useState(null);
+function Login() {
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      if (mode === 'login') {
-        await login(username, password);
-      } else {
-        await register(username, password);
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error');
+    setError('');
+    setLoading(true);
+
+    const result = await login(formData.username, formData.password);
+    
+    if (!result.success) {
+      setError(result.message);
     }
+    
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 shadow-sm border border-gray-200">
-        <h2 className="text-center text-2xl font-bold text-gray-900">
-          {mode === 'login' ? 'Вход в систему' : 'Регистрация' }
-        </h2>
-        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <input
-              className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-[#9333ea] focus:border-[#9333ea] focus:z-10 sm:text-sm"
-              placeholder="Имя пользователя"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-            <input
-              type="password"
-              className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-[#9333ea] focus:border-[#9333ea] focus:z-10 sm:text-sm mt-4"
-              placeholder="Пароль"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center px-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Вход в Portfolio Risk
+            </h1>
+            <p className="text-gray-600">
+              Введите свои учетные данные для входа
+            </p>
           </div>
-          <button
-            type="submit"
-            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[#9333ea] hover:bg-[#7c3aed] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#9333ea]"
-          >
-            {mode === 'login' ? 'Войти' : 'Зарегистрироваться'}
-          </button>
-        </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
-          {mode === 'login' ? (
-            <>Нет аккаунта?{' '}
-              <button className="text-[#9333ea]" onClick={() => setMode('register')}>Зарегистрироваться</button>
-            </>
-          ) : (
-            <>Уже есть аккаунт?{' '}
-              <button className="text-[#9333ea]" onClick={() => setMode('login')}>Войти</button>
-            </>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
+              {error}
+            </div>
           )}
-        </p>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Имя пользователя
+              </label>
+              <input
+                type="text"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-purple-400 focus:border-purple-400"
+                placeholder="Введите имя пользователя"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Пароль
+              </label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-purple-400 focus:border-purple-400"
+                placeholder="Введите пароль"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-2 px-4 rounded-md font-medium hover:from-purple-600 hover:to-indigo-700 focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Вход...' : 'Войти'}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-gray-600 text-sm">
+              Нет аккаунта?{' '}
+              <Link 
+                to="/register" 
+                className="text-purple-600 hover:text-purple-700 font-medium"
+              >
+                Зарегистрироваться
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
-} 
+}
+
+export default Login; 
+ 
+ 
+ 

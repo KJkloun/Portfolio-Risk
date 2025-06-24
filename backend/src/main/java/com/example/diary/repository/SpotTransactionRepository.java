@@ -14,4 +14,10 @@ public interface SpotTransactionRepository extends JpaRepository<SpotTransaction
     List<SpotTransaction> findByTransactionTypeOrderByTradeDateDesc(SpotTransaction.TransactionType transactionType);
     
     List<SpotTransaction> findByCompanyOrderByTradeDateDesc(String company);
+    
+    List<SpotTransaction> findByPortfolioId(Long portfolioId);
+    
+    List<SpotTransaction> findByPortfolioIdAndTickerOrderByTradeDateDesc(Long portfolioId, String ticker);
+    
+    List<SpotTransaction> findByPortfolioIdAndTransactionTypeOrderByTradeDateDesc(Long portfolioId, SpotTransaction.TransactionType transactionType);
 } 

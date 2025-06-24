@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function DailySummary() {
   const [transactions, setTransactions] = useState([]);
@@ -11,8 +12,8 @@ function DailySummary() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/spot-transactions');
-      const data = await response.json();
+      const response = await axios.get('/api/spot-transactions');
+      const data = response.data;
       setTransactions(data);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -21,15 +22,18 @@ function DailySummary() {
     }
   };
 
-  const calculateDailySummary = () => {
-    // Group transactions by date
-    const dailyGroups = {};
+  const calculateDailySummary = (transactions) => {
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return [];
+    }
+
+    const dailyData = {};
     
-    transactions.forEach(tx => {
-      const date = new Date(tx.tradeDate).toDateString();
-      if (!dailyGroups[date]) {
-        dailyGroups[date] = {
-          date: tx.tradeDate,
+    transactions.forEach(transaction => {
+      const date = new Date(transaction.tradeDate).toDateString();
+      if (!dailyData[date]) {
+        dailyData[date] = {
+          date: transaction.tradeDate,
           transactions: [],
           totalBuyAmount: 0,
           totalSellAmount: 0,
@@ -41,41 +45,41 @@ function DailySummary() {
         };
       }
       
-      dailyGroups[date].transactions.push(tx);
-      dailyGroups[date].transactionCount++;
+      dailyData[date].transactions.push(transaction);
+      dailyData[date].transactionCount++;
       
-      const amount = tx.price * tx.quantity;
+      const amount = transaction.price * transaction.quantity;
       
-      switch (tx.transactionType) {
+      switch (transaction.transactionType) {
         case 'BUY':
-          dailyGroups[date].totalBuyAmount += amount;
-          dailyGroups[date].netCashFlow -= amount;
+          dailyData[date].totalBuyAmount += amount;
+          dailyData[date].netCashFlow -= amount;
           break;
         case 'SELL':
-          dailyGroups[date].totalSellAmount += amount;
-          dailyGroups[date].netCashFlow += amount;
+          dailyData[date].totalSellAmount += amount;
+          dailyData[date].netCashFlow += amount;
           break;
         case 'DEPOSIT':
-          dailyGroups[date].totalDeposits += amount;
-          dailyGroups[date].netCashFlow += amount;
+          dailyData[date].totalDeposits += amount;
+          dailyData[date].netCashFlow += amount;
           break;
         case 'WITHDRAW':
-          dailyGroups[date].totalWithdrawals += amount;
-          dailyGroups[date].netCashFlow -= amount;
+          dailyData[date].totalWithdrawals += amount;
+          dailyData[date].netCashFlow -= amount;
           break;
         case 'DIVIDEND':
-          dailyGroups[date].totalDividends += amount;
-          dailyGroups[date].netCashFlow += amount;
+          dailyData[date].totalDividends += amount;
+          dailyData[date].netCashFlow += amount;
           break;
       }
     });
 
     // Convert to array and sort by date (newest first)
-    return Object.values(dailyGroups)
+    return Object.values(dailyData)
       .sort((a, b) => new Date(b.date) - new Date(a.date));
   };
 
-  const dailySummaries = calculateDailySummary();
+  const dailySummaries = calculateDailySummary(transactions);
   
   // Calculate overall stats
   const totalTransactions = transactions.length;

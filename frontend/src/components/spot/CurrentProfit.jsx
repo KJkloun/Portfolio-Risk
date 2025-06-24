@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function CurrentProfit() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Mock current prices
-  const mockPrices = {
-    'BA': 245.50,
-    'XLNX': 185.30,
-    'USD': 1.00
+  // Читаем сохранённые курсы акций
+  const getSavedPrices = () => {
+    try {
+      return JSON.parse(localStorage.getItem('stockPrices')) || {};
+    } catch {
+      return {};
+    }
   };
+  const savedPrices = getSavedPrices();
 
   useEffect(() => {
     fetchTransactions();
@@ -18,11 +22,19 @@ function CurrentProfit() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/spot-transactions');
-      const data = await response.json();
-      setTransactions(data);
+      const response = await axios.get('/api/spot-transactions');
+      const data = response.data;
+      
+      // Check if data is an array
+      if (Array.isArray(data)) {
+        setTransactions(data);
+      } else {
+        console.warn('API returned non-array data:', data);
+        setTransactions([]);
+      }
     } catch (error) {
       console.error('Error fetching transactions:', error);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -70,7 +82,7 @@ function CurrentProfit() {
 
     // Calculate unrealized P&L for remaining positions
     const positionAnalysis = Object.values(positions).map(pos => {
-      const currentPrice = mockPrices[pos.ticker] || 0;
+      const currentPrice = savedPrices[pos.ticker] || 0;
       const currentValue = pos.shares * currentPrice;
       const unrealizedPL = pos.shares > 0 ? currentValue - pos.totalCost : 0;
       const avgPrice = pos.shares > 0 ? pos.totalCost / pos.shares : 0;

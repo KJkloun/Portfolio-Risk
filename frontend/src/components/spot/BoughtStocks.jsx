@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 
 function BoughtStocks() {
   const [transactions, setTransactions] = useState([]);
@@ -12,8 +13,8 @@ function BoughtStocks() {
   const fetchBoughtStocks = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/spot-transactions');
-      const allTransactions = await response.json();
+      const response = await axios.get('/api/spot-transactions');
+      const allTransactions = response.data;
       
       // Filter only BUY transactions
       const boughtStocks = allTransactions

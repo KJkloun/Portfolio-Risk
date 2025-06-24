@@ -3,6 +3,8 @@ package com.example.diary.model;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(name = "spot_transactions")
@@ -50,13 +52,15 @@ public class SpotTransaction {
     private BigDecimal amount; // Стоимость (price * quantity, может быть отрицательной для покупок)
 
     @Column(name = "trade_date")
+    @JsonProperty("transactionDate")
     private LocalDate tradeDate;
 
     @Column(name = "note")
     private String note;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "portfolio_id")
+    @JoinColumn(name = "portfolio_id", nullable = false)
+    @JsonBackReference("portfolio-spotTransactions")
     private Portfolio portfolio;
 
     // Конструкторы

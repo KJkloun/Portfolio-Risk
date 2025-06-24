@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 
 function FifoAnalysis() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Mock prices for calculations
-  const mockPrices = {
-    'BA': 245.50,
-    'XLNX': 185.30,
-    'USD': 1.00
+  // Получаем сохранённые курсы акций из localStorage один раз при монтировании
+  const getSavedPrices = () => {
+    try {
+      return JSON.parse(localStorage.getItem('stockPrices')) || {};
+    } catch {
+      return {};
+    }
   };
+  const savedPrices = getSavedPrices();
 
   useEffect(() => {
     fetchTransactions();
@@ -19,11 +23,19 @@ function FifoAnalysis() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8081/api/spot-transactions');
-      const data = await response.json();
-      setTransactions(data.sort((a, b) => new Date(a.tradeDate) - new Date(b.tradeDate)));
+      const response = await axios.get('/api/spot-transactions');
+      const data = response.data;
+      
+      // Check if data is an array before sorting
+      if (Array.isArray(data)) {
+        setTransactions(data.sort((a, b) => new Date(a.tradeDate) - new Date(b.tradeDate)));
+      } else {
+        console.warn('API returned non-array data:', data);
+        setTransactions([]);
+      }
     } catch (error) {
       console.error('Error fetching transactions:', error);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -94,7 +106,7 @@ function FifoAnalysis() {
     // Calculate unrealized P&L for remaining positions
     Object.keys(positions).forEach(ticker => {
       if (positions[ticker].shares > 0) {
-        const currentPrice = mockPrices[ticker] || 0;
+        const currentPrice = savedPrices[ticker] || 0;
         const currentValue = positions[ticker].shares * currentPrice;
         const unrealizedPL = currentValue - positions[ticker].totalCost;
         
@@ -245,7 +257,7 @@ function FifoAnalysis() {
                 {Object.entries(analysis.positions).map(([ticker, position]) => {
                   if (position.shares <= 0) return null;
                   
-                  const currentPrice = mockPrices[ticker] || 0;
+                  const currentPrice = savedPrices[ticker] || 0;
                   const currentValue = position.shares * currentPrice;
                   const unrealizedPL = currentValue - position.totalCost;
                   const unrealizedPercent = position.totalCost > 0 ? (unrealizedPL / position.totalCost) * 100 : 0;
