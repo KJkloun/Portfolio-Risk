@@ -1,0 +1,1 @@
+ALTER TABLE trades ADD COLUMN IF NOT EXISTS portfolio_id BIGINT; 

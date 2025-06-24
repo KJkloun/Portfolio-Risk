@@ -28,5 +28,8 @@ public interface TradeRepository extends JpaRepository<Trade, Long> {
            "WHERE t.exitDate BETWEEN :startDate AND :endDate " +
            "GROUP BY FUNCTION('DATE_FORMAT', t.exitDate, '%Y-%m') " +
            "ORDER BY month")
-    List<Object[]> findMonthlyProfits(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    List<Object[]> findMonthlyProfits(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);    
+    // Методы для работы с портфелями
+    @Query("SELECT t FROM Trade t LEFT JOIN t.portfolio p WHERE p.id = :portfolioId")
+    List<Trade> findByPortfolioId(@Param("portfolioId") Long portfolioId);
 }

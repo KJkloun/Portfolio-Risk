@@ -7,6 +7,8 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
 @Table(name = "trades")
@@ -53,6 +55,15 @@ public class Trade {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @OneToMany(mappedBy = "trade", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("trade-closures")
+    private List<TradeClosure> closures = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "portfolio_id", nullable = false)
+    @JsonBackReference("portfolio-trades")
+    private Portfolio portfolio;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -82,6 +93,12 @@ public class Trade {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public List<TradeClosure> getClosures() { return closures; }
+    public void setClosures(List<TradeClosure> closures) { this.closures = closures; }
+
+    public Portfolio getPortfolio() { return portfolio; }
+    public void setPortfolio(Portfolio portfolio) { this.portfolio = portfolio; }
 
     @Transient
     public Double getTotalCost() {
@@ -137,6 +154,13 @@ public class Trade {
             currentDate = currentDate.plusDays(1);
         }
         return result;
+    }
+
+    @Transient
+    public Integer getOpenQuantity() {
+        if (quantity == null) return null;
+        int closed = closures.stream().mapToInt(c -> c.getClosedQuantity()).sum();
+        return quantity - closed;
     }
 
     public static class DailyInterest {

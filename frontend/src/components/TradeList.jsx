@@ -8,9 +8,19 @@ import {
   calculateProfit, 
   calculateProfitPercentage 
 } from '../utils/calculations';
+import { 
+  calculateAccumulatedInterest, 
+  getRateChangesFromStorage,
+  calculateSavingsFromRateChanges 
+} from '../utils/interestCalculations';
 import Button from './common/Button';
+import { useNavigate } from 'react-router-dom';
+import TradeDetailsModal from './TradeDetailsModal';
+import { usePortfolio } from '../contexts/PortfolioContext';
+import { formatPortfolioCurrency } from '../utils/currencyFormatter';
 
 function TradeList() {
+  const { currentPortfolio } = usePortfolio();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,6 +37,7 @@ function TradeList() {
   const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [stockPrices, setStockPrices] = useState({});
+  const navigate = useNavigate();
   
   // Состояния для дополнительных фильтров
   const [isFilterPanelExpanded, setIsFilterPanelExpanded] = useState(false);
@@ -35,9 +46,67 @@ function TradeList() {
   const [profitabilityFilter, setProfitabilityFilter] = useState('all'); // 'all', 'profitable', 'unprofitable'
   const [positionSizeFilter, setPositionSizeFilter] = useState('all'); // 'all', 'small', 'medium', 'large'
 
+  // Состояние для изменений ставок ЦБ РФ
+  const [rateChanges, setRateChanges] = useState([]);
+
+  const [modalTradeId, setModalTradeId] = useState(null);
+
+  // Currency formatting function
+  const formatCurrency = (amount, decimals = 0) => {
+    return formatPortfolioCurrency(amount, currentPortfolio, decimals);
+  };
+
   useEffect(() => {
     loadTrades();
     loadSavedStockPrices();
+    loadRateChanges();
+  }, [currentPortfolio]);
+
+  // Загрузка изменений ставок из localStorage
+  const loadRateChanges = () => {
+    const changes = getRateChangesFromStorage();
+    setRateChanges(changes);
+  };
+
+  // Обработчик события обновления сделок из других компонентов
+  useEffect(() => {
+    const handleTradesUpdated = (event) => {
+      console.log('TradeList: Получено событие обновления сделок:', event.detail);
+      
+      // Перезагружаем список сделок после изменения ставок
+      loadTrades();
+      
+      // Очищаем выбранные сделки после обновления
+      setSelectedTrades({});
+      setSelectAllChecked(false);
+      
+      if (event.detail.source === 'floating-rates') {
+        console.log(`📋 Список сделок обновлен: применена ставка ${event.detail.newRate}% к ${event.detail.updatedTrades} сделкам`);
+      }
+    };
+
+    // Обработчик события изменения ставок ЦБ РФ
+    const handleRateChangesUpdated = (event) => {
+      console.log('TradeList: Получено событие изменения ставок ЦБ РФ:', event.detail);
+      
+      // Обновляем изменения ставок
+      setRateChanges(event.detail.rateChanges);
+      
+      // Форсируем пересчет накопленных процентов
+      setTrades(prevTrades => [...prevTrades]);
+      
+      console.log('📊 Накопленные проценты пересчитаны с учетом новых ставок ЦБ РФ');
+    };
+
+    // Добавляем слушатели событий
+    window.addEventListener('tradesUpdated', handleTradesUpdated);
+    window.addEventListener('rateChangesUpdated', handleRateChangesUpdated);
+
+    // Очищаем слушатели при размонтировании компонента
+    return () => {
+      window.removeEventListener('tradesUpdated', handleTradesUpdated);
+      window.removeEventListener('rateChangesUpdated', handleRateChangesUpdated);
+    };
   }, []);
 
   useEffect(() => {
@@ -49,9 +118,18 @@ function TradeList() {
   }, []);
 
   const loadTrades = async () => {
+    if (!currentPortfolio?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await axios.get('/api/trades');
+      const response = await axios.get('/api/trades', {
+        headers: {
+          'X-Portfolio-ID': currentPortfolio.id
+        }
+      });
       console.log('API response:', response);
       if (Array.isArray(response.data)) {
         setTrades(response.data);
@@ -217,9 +295,9 @@ function TradeList() {
       return filteredAndSortedTrades.reduce((groups, trade) => {
         const entryPrice = Number(trade.entryPrice);
         
-        // Определяем диапазоны цен - округляем до ближайших 10
-        const priceBase = Math.floor(entryPrice / 10) * 10;
-        const priceRange = `${priceBase}-${priceBase + 10}`;
+        // Определяем диапазоны цен - округляем до ближайших 5
+        const priceBase = Math.floor(entryPrice / 5) * 5;
+        const priceRange = `${priceBase}-${priceBase + 5}`;
         const priceKey = `price-${priceBase}`;
         
         if (!groups[priceKey]) {
@@ -281,7 +359,7 @@ function TradeList() {
       const initialCollapsedState = {};
       filteredAndSortedTrades.forEach(trade => {
         const entryPrice = Number(trade.entryPrice);
-        const priceBase = Math.floor(entryPrice / 10) * 10;
+        const priceBase = Math.floor(entryPrice / 5) * 5;
         const priceKey = `price-${priceBase}`;
         initialCollapsedState[priceKey] = true; // true = свернуто
       });
@@ -311,7 +389,7 @@ function TradeList() {
         const totalInterest = response.data.totalInterest || 0;
         const profit = response.data.profit || 0;
         
-        alert(`Сделка закрыта!\nОбщий процент: ${totalInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}\nПрибыль: ${profit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}`);
+        alert(`Сделка закрыта!\nОбщий процент: ${formatCurrency(totalInterest)}\nПрибыль: ${formatCurrency(profit)}`);
       } else {
         console.error('Invalid response format:', response.data);
         alert('Сделка закрыта, но возникла ошибка при обновлении данных');
@@ -331,7 +409,11 @@ function TradeList() {
       try {
         setError('');
         console.log('Deleting trade:', tradeId);
-        await axios.delete(`/api/trades/${tradeId}`);
+        await axios.delete(`/api/trades/${tradeId}`, {
+          headers: {
+            'X-Portfolio-ID': currentPortfolio?.id
+          }
+        });
         console.log('Trade deleted successfully');
         loadTrades();
       } catch (err) {
@@ -747,7 +829,7 @@ function TradeList() {
                       {group.totalQuantity} шт.
                     </span>
                     <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                      {group.totalSum.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(group.totalSum)}
                     </span>
                   </div>
                 </div>
@@ -823,6 +905,8 @@ function TradeList() {
           </div>
         </div>
       )}
+
+      {modalTradeId && <TradeDetailsModal tradeId={modalTradeId} onClose={()=>setModalTradeId(null)} />}
     </div>
   );
 
@@ -840,8 +924,8 @@ function TradeList() {
     const exitDate = trade.exitDate ? parseDateLocal(trade.exitDate) : new Date();
     const daysHeld = Math.ceil((exitDate - entryDate) / (1000 * 60 * 60 * 24));
     
-    // Calculate accumulated interest for the whole period
-    const accumulatedInterest = roundedDailyInterest * daysHeld;
+    // Calculate accumulated interest using new utility with CB rate changes
+    const accumulatedInterest = calculateAccumulatedInterest(trade, rateChanges);
     
     // Calculate profit if closed
     let profit = 0;
@@ -875,7 +959,8 @@ function TradeList() {
     return (
       <div
         key={trade.id}
-        className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200"
+        className="bg-white rounded-xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-pointer"
+        onClick={() => setModalTradeId(trade.id)}
       >
         {/* Card Header */}
         <div className="p-3 flex justify-between items-center border-b border-gray-100 bg-gray-50">
@@ -883,7 +968,10 @@ function TradeList() {
             <input
               type="checkbox"
               checked={selectedTrades[trade.id] || false}
-              onChange={() => handleToggleSelect(trade.id)}
+              onChange={(e) => {
+                e.stopPropagation();
+                handleToggleSelect(trade.id);
+              }}
               className="h-4 w-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
             />
             <div className="text-lg font-semibold text-gray-900">{trade.symbol}</div>
@@ -903,7 +991,7 @@ function TradeList() {
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Вход:</span>
               <span className="font-medium">
-                {Number(trade.entryPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
+                {formatCurrency(Number(trade.entryPrice), 2)}
               </span>
             </div>
             
@@ -911,7 +999,7 @@ function TradeList() {
               <span className="text-gray-500">Выход:</span>
               <span className="font-medium">
                 {trade.exitPrice
-                  ? Number(trade.exitPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })
+                  ? formatCurrency(Number(trade.exitPrice), 2)
                   : '—'}
               </span>
             </div>
@@ -925,7 +1013,7 @@ function TradeList() {
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Сумма:</span>
               <span className="font-medium">
-                {roundedTotalCost.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                {formatCurrency(roundedTotalCost)}
               </span>
             </div>
             
@@ -940,7 +1028,7 @@ function TradeList() {
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Ежедн. %:</span>
               <span className="font-medium">
-                {roundedDailyInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                {formatCurrency(roundedDailyInterest)}
               </span>
             </div>
             
@@ -952,8 +1040,8 @@ function TradeList() {
             
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Накоплено %:</span>
-              <span className="font-medium text-red-600 text-right max-w-[90px] truncate" title={accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}>
-                {accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+              <span className="font-medium text-red-600 text-right max-w-[90px] truncate" title={formatCurrency(accumulatedInterest)}>
+                {formatCurrency(accumulatedInterest)}
               </span>
             </div>
           </div>
@@ -966,7 +1054,7 @@ function TradeList() {
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Прибыль без %</div>
                     <div className={`font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {profit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(profit)}
                       <span className="text-xs ml-1 text-gray-500">
                         ({profitPercent.toFixed(1)}%)
                       </span>
@@ -976,7 +1064,7 @@ function TradeList() {
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Итоговая прибыль</div>
                     <div className={`font-semibold ${profitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {profitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(profitAfterInterest)}
                       <span className="text-xs ml-1 text-gray-500">
                         ({profitAfterInterestPercent.toFixed(1)}%)
                       </span>
@@ -995,7 +1083,7 @@ function TradeList() {
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Потенциальная прибыль</div>
                     <div className={`font-semibold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(potentialProfit)}
                       <span className="text-xs ml-1 text-gray-500">
                         ({potentialProfitPercent.toFixed(1)}%)
                       </span>
@@ -1005,7 +1093,7 @@ function TradeList() {
                   <div>
                     <div className="text-xs text-gray-500 mb-1">После вычета %</div>
                     <div className={`font-semibold ${potentialProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {potentialProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(potentialProfitAfterInterest)}
                       <span className="text-xs ml-1 text-gray-500">
                         ({potentialProfitAfterInterestPercent.toFixed(1)}%)
                       </span>
@@ -1013,7 +1101,7 @@ function TradeList() {
                   </div>
                 </div>
                 <div className="text-xs text-right text-gray-500 mt-1">
-                  При курсе {parseFloat(currentPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
+                  При курсе {formatCurrency(parseFloat(currentPrice), 2)}
                 </div>
               </div>
             </div>
@@ -1034,7 +1122,10 @@ function TradeList() {
                 variant="primary"
                 size="sm"
                 className="flex-1"
-                onClick={() => setSellingTrade(trade)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSellingTrade(trade);
+                }}
               >
                 Закрыть
               </Button>
@@ -1043,7 +1134,10 @@ function TradeList() {
               variant="danger"
               size="sm"
               className="flex-1"
-              onClick={() => handleDelete(trade.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(trade.id);
+              }}
             >
               Удалить
             </Button>

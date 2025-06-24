@@ -1,8 +1,55 @@
 import { useState } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
+import { usePortfolio } from '../contexts/PortfolioContext';
+
+// Функция для парсинга различных форматов дат
+const parseFlexibleDate = (dateString) => {
+  if (!dateString) return null;
+  
+  // Убираем лишние пробелы и приводим к строке
+  const cleanDate = String(dateString).trim();
+  if (!cleanDate) return null;
+  
+  // Попробуем различные форматы
+  const dateFormats = [
+    // ISO формат: 2023-05-02
+    /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/,
+    // Европейский формат: 02.05.2023, 02/05/2023, 02-05-2023
+    /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/,
+    // Американский формат: 05/02/2023, 05-02-2023, 05.02.2023
+    /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/,
+  ];
+  
+  // Проверяем ISO формат (YYYY-MM-DD)
+  const isoMatch = cleanDate.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Проверяем европейский формат (DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY)
+  const euMatch = cleanDate.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+  if (euMatch) {
+    const [, day, month, year] = euMatch;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+  
+  // Попробуем стандартный парсер Date для других форматов
+  try {
+    const parsedDate = new Date(cleanDate);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    }
+  } catch (e) {
+    console.warn('Не удалось распарсить дату:', cleanDate);
+  }
+  
+  return null;
+};
 
 function BulkImport() {
+  const { currentPortfolio } = usePortfolio();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -62,10 +109,36 @@ function BulkImport() {
           const worksheet = workbook.Sheets[firstSheet];
           const jsonData = XLSX.utils.sheet_to_json(worksheet);
           
-          console.log("Sending data to server:", { trades: jsonData });
+          // Обрабатываем даты и автозакрытие сделок
+          const processedTrades = jsonData.map(trade => {
+            const processedTrade = { ...trade };
+            
+            // Обрабатываем дату входа
+            if (trade.entryDate) {
+              processedTrade.entryDate = parseFlexibleDate(trade.entryDate);
+            }
+            
+            // Обрабатываем дату выхода и автозакрытие
+            if (trade.exitDate) {
+              processedTrade.exitDate = parseFlexibleDate(trade.exitDate);
+              
+              // Если есть дата выхода, но нет цены выхода, попробуем взять из entryPrice
+              if (processedTrade.exitDate && !processedTrade.exitPrice && trade.exitPrice) {
+                processedTrade.exitPrice = trade.exitPrice;
+              }
+            }
+            
+            return processedTrade;
+          });
+          
+          console.log("Sending processed data to server:", { trades: processedTrades });
           
           // Send data to server
-          const response = await axios.post('/api/trades/bulk-import', { trades: jsonData });
+          const response = await axios.post('/api/trades/bulk-import', { trades: processedTrades }, {
+            headers: currentPortfolio?.id ? {
+              'X-Portfolio-ID': currentPortfolio.id
+            } : {}
+          });
           console.log("Server response:", response.data);
           setSuccess(`${response.data.importedCount} сделок успешно импортировано`);
           setFile(null);
@@ -94,8 +167,10 @@ function BulkImport() {
     // Create template workbook
     const ws = XLSX.utils.aoa_to_sheet([
       ['symbol', 'entryPrice', 'quantity', 'entryDate', 'marginAmount', 'notes', 'exitDate', 'exitPrice'],
-      ['GAZP', '115.00', '10000', '2023-05-02', '23', 'Пример записи', '', ''],
-      ['SBER', '240.50', '5000', '2023-04-15', '23', 'Тест', '2023-05-20', '255.30'],
+      ['GAZP', '115.00', '10000', '2023-05-02', '23', 'Пример записи ISO формат', '', ''],
+      ['SBER', '240.50', '5000', '15.04.2023', '23', 'Пример европейский формат', '20.05.2023', '255.30'],
+      ['AAPL', '150.25', '100', '04/15/2023', '20', 'Пример американский формат', '05/20/2023', '160.50'],
+      ['MSFT', '280.75', '50', '15-04-2023', '18', 'Формат с дефисами', '20-05-2023', '290.25'],
     ]);
     
     // Set column widths
@@ -230,7 +305,7 @@ function BulkImport() {
                 </tr>
                 <tr>
                   <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">entryDate</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Дата входа в формате ГГГГ-ММ-ДД</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Дата входа (поддерживаются форматы: ГГГГ-ММ-ДД, ДД.ММ.ГГГГ, ММ/ДД/ГГГГ, ДД-ММ-ГГГГ)</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-green-600">Да</td>
                 </tr>
                 <tr>
@@ -245,7 +320,7 @@ function BulkImport() {
                 </tr>
                 <tr>
                   <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">exitDate</td>
-                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Дата выхода в формате ГГГГ-ММ-ДД (для закрытых сделок)</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Дата выхода для автозакрытия сделок (любой поддерживаемый формат)</td>
                   <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">Нет</td>
                 </tr>
                 <tr>
@@ -255,6 +330,19 @@ function BulkImport() {
                 </tr>
               </tbody>
             </table>
+          </div>
+          
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-sm font-medium text-blue-800 mb-2">📅 Поддерживаемые форматы дат</h3>
+            <div className="text-xs text-blue-700 grid grid-cols-2 gap-2">
+              <div>• ISO: 2023-05-02</div>
+              <div>• Европейский: 02.05.2023</div>
+              <div>• Американский: 05/02/2023</div>
+              <div>• С дефисами: 02-05-2023</div>
+            </div>
+            <p className="text-xs text-blue-600 mt-2">
+              <strong>Автозакрытие:</strong> Если указана exitDate с exitPrice, сделка будет автоматически закрыта при импорте.
+            </p>
           </div>
         </div>
         
