@@ -14,9 +14,10 @@ export const DEFAULT_INTEREST_RATE = 22.0;
 export const roundToTwoDecimals = (value) => Math.round(value * 100) / 100;
 
 /**
- * Formats a number as Russian currency
+ * Formats a number as Russian currency (DEPRECATED - use formatPortfolioCurrency instead)
  * @param {number} amount - The amount to format
  * @returns {string} Formatted currency string
+ * @deprecated Use formatPortfolioCurrency from currencyFormatter.js for portfolio-aware formatting
  */
 export const formatCurrency = (amount) => {
   return amount.toLocaleString('ru-RU', { 

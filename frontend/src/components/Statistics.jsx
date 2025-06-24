@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { usePortfolio } from '../contexts/PortfolioContext';
+import { formatPortfolioCurrency } from '../utils/currencyFormatter';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -43,6 +45,7 @@ ChartJS.register(
   Legend
 );
 function Statistics() {
+  const { currentPortfolio } = usePortfolio();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -53,6 +56,23 @@ function Statistics() {
   const [selectedStocksForPDF, setSelectedStocksForPDF] = useState([]);
   // Состояние для изменений ставок ЦБ РФ
   const [rateChanges, setRateChanges] = useState([]);
+  
+  // Функция форматирования валюты
+  const formatCurrency = (amount, decimals = 0) => {
+    return formatPortfolioCurrency(amount, currentPortfolio, decimals);
+  };
+
+  // Функция для использования в chart.js callbacks
+  const formatCurrencyForChart = (amount, decimals = 0) => {
+    if (!currentPortfolio?.currency) return '—';
+    
+    const currency = currentPortfolio.currency;
+    return new Intl.NumberFormat('ru-RU', {
+      style: 'currency',
+      currency: currency,
+      maximumFractionDigits: decimals
+    }).format(amount);
+  };
   const [stats, setStats] = useState({
     totalCostOpen: 0,
     totalInterestDaily: 0,
@@ -89,7 +109,7 @@ function Statistics() {
     loadTrades();
     loadSavedStockPrices();
     loadRateChanges();
-  }, []);
+  }, [currentPortfolio]);
   // Загрузка изменений ставок из localStorage
   const loadRateChanges = () => {
     const changes = getRateChangesFromStorage();
@@ -189,9 +209,18 @@ function Statistics() {
     }
   };
   const loadTrades = async () => {
+    if (!currentPortfolio?.id) {
+      setLoading(false);
+      return;
+    }
+    
     try {
       setLoading(true);
-      const response = await axios.get('/api/trades');
+      const response = await axios.get('/api/trades', {
+        headers: {
+          'X-Portfolio-ID': currentPortfolio.id
+        }
+      });
       console.log('Statistics API response:', response);
       if (Array.isArray(response.data)) {
         setTrades(response.data);
@@ -1183,17 +1212,39 @@ function Statistics() {
       }]
     };
   };
-  if (loading) {
+  if (!currentPortfolio) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-600 border-r-2 border-b-2 border-transparent"></div>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-400 mb-4">📊</div>
+          <p className="text-gray-700 mb-4">Портфель не выбран</p>
+          <button
+            onClick={() => window.location.href = '/'}
+            className="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Выбрать портфель
+          </button>
+        </div>
       </div>
     );
   }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-6 max-w-6xl mx-auto">
-        <h1 className="text-2xl font-medium text-gray-900 mb-8">Статистика торговли</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+      <div className="container-fluid p-4 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <h3 className="text-2xl font-light text-gray-800 mb-2">Статистика торговли</h3>
+          <p className="text-gray-500">Анализ эффективности маржинальных операций ({currentPortfolio?.currency || 'RUB'})</p>
+        </div>
         {/* Error message */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
@@ -1240,34 +1291,34 @@ function Statistics() {
         </div>
         {/* Saved stock prices info */}
         {Object.keys(stockPrices).length > 0 && (
-          <div className="mb-8 p-4 bg-white border border-gray-200 rounded-lg text-sm">
+          <div className="mb-8 p-4 bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 text-sm">
             <div className="font-medium text-gray-700 mb-2">Текущие курсы акций:</div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(stockPrices)
                 .filter(([_, price]) => price && !isNaN(parseFloat(price)))
                 .map(([symbol, price]) => (
                   <span key={symbol} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs">
-                    {symbol}: {parseFloat(price).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
+                    {symbol}: {formatCurrency(parseFloat(price))}
                   </span>
                 ))}
             </div>
           </div>
         )}
         {/* Main statistics */}
-        <div className="mb-8">
+        <div className="mb-8 space-y-6">
           {selectedStock === 'all' ? (
             // General statistics
             <div>
               {/* Detailed stats */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Сводка портфеля</h3>
                   <div className="space-y-4">
                     {/* Basic portfolio info */}
                     <div>
                       <div className="flex justify-between text-sm mb-2">
                         <span className="text-gray-600">Стоимость позиций</span>
-                        <span className="font-medium">{stats.totalCostOpen.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
+                        <span className="font-medium">{formatCurrency(stats.totalCostOpen)}</span>
                       </div>
                       <div className="flex justify-between text-sm mb-2">
                         <span className="text-gray-600">Активных акций</span>
@@ -1285,19 +1336,19 @@ function Statistics() {
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Зафиксированная</span>
                           <span className={stats.totalProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                            {stats.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            {formatCurrency(stats.totalProfit)}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Потенциальная</span>
                           <span className={stats.potentialProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                            {stats.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            {formatCurrency(stats.potentialProfit)}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
                           <span className="text-gray-700 font-medium">Общая</span>
                           <span className={`font-bold ${stats.totalOverallProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {stats.totalOverallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            {formatCurrency(stats.totalOverallProfit)}
                           </span>
                         </div>
                       </div>
@@ -1308,23 +1359,23 @@ function Statistics() {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Заплачено по закрытым</span>
-                          <span className="text-red-600 font-medium">-{stats.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                          <span className="text-red-600 font-medium">-{formatCurrency(stats.totalInterestPaid)}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Накоплено по открытым</span>
-                          <span className="text-red-500">-{stats.totalAccruedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                          <span className="text-red-500">-{formatCurrency(stats.totalAccruedInterest)}</span>
                         </div>
                         <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
                           <span className="text-gray-700 font-medium">Итого после %</span>
                           <span className={`font-bold ${stats.totalOverallProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {stats.totalOverallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                            {formatCurrency(stats.totalOverallProfitAfterInterest)}
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Активность</h3>
                   <div className="space-y-4">
                     {/* Trade summary */}
@@ -1356,7 +1407,7 @@ function Statistics() {
                           <span className="text-gray-600">Средняя прибыль/сделка</span>
                           <span className="font-medium">
                             {stats.totalTradesClosed > 0 
-                              ? (stats.totalProfit / stats.totalTradesClosed).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })
+                              ? formatCurrency(stats.totalProfit / stats.totalTradesClosed)
                               : '—'
                             }
                           </span>
@@ -1373,7 +1424,7 @@ function Statistics() {
               {(() => {
                 const stockData = calculateStockMetrics(selectedStock);
                 if (!stockData) return (
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 text-center">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6 text-center">
                     <p className="text-gray-500">Нет данных для выбранной акции</p>
                   </div>
                 );
@@ -1381,14 +1432,14 @@ function Statistics() {
                   <div>
                     {/* Detailed stats for specific stock */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="bg-white p-6 rounded-lg border border-gray-200">
+                      <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
                         <h3 className="text-lg font-medium text-gray-900 mb-4">Портфель ({selectedStock})</h3>
                         <div className="space-y-4">
                           {/* Basic info */}
                           <div>
                             <div className="flex justify-between text-sm mb-2">
                               <span className="text-gray-600">Стоимость позиций</span>
-                              <span className="font-medium">{stockData.totalInvested.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
+                              <span className="font-medium">{formatCurrency(stockData.totalInvested)}</span>
                             </div>
                             <div className="flex justify-between text-sm mb-2">
                               <span className="text-gray-600">Активных акций</span>
@@ -1406,19 +1457,19 @@ function Statistics() {
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Зафиксированная</span>
                                 <span className={stockData.totalProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                  {stockData.totalProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  {formatCurrency(stockData.totalProfit)}
                                 </span>
                               </div>
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Потенциальная</span>
                                 <span className={stockData.potentialProfit >= 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                  {stockData.potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  {formatCurrency(stockData.potentialProfit)}
                                 </span>
                               </div>
                               <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
                                 <span className="text-gray-700 font-medium">Общая</span>
                                 <span className={`font-bold ${stockData.overallProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {stockData.overallProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  {formatCurrency(stockData.overallProfit)}
                                 </span>
                               </div>
                             </div>
@@ -1429,44 +1480,44 @@ function Statistics() {
                             <div className="space-y-2">
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Заплачено по закрытым</span>
-                                <span className="text-red-600 font-medium">-{stockData.totalInterestPaid.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                                <span className="text-red-600 font-medium">-{formatCurrency(stockData.totalInterestPaid)}</span>
                               </div>
                               <div className="flex justify-between text-sm">
                                 <span className="text-gray-600">Накоплено по открытым</span>
-                                <span className="text-red-500">-{stockData.accumulatedInterest.toLocaleString('ru-RU', {style: 'currency', currency: 'RUB', maximumFractionDigits: 0})}</span>
+                                <span className="text-red-500">-{formatCurrency(stockData.accumulatedInterest)}</span>
                               </div>
                               <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
                                 <span className="text-gray-700 font-medium">Итого после %</span>
                                 <span className={`font-bold ${stockData.overallProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {stockData.overallProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                                  {formatCurrency(stockData.overallProfitAfterInterest)}
                                 </span>
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                      <div className="bg-white p-6 rounded-lg border border-gray-200">
+                      <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
                         <h3 className="text-lg font-medium text-gray-900 mb-4">Детали по {selectedStock}</h3>
                         <div className="space-y-4">
                           {/* Price info */}
                           <div>
                             <div className="flex justify-between text-sm mb-2">
                               <span className="text-gray-600">Средняя цена входа</span>
-                              <span className="font-medium">{stockData.avgEntryPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
+                              <span className="font-medium">{formatCurrency(stockData.avgEntryPrice, 2)}</span>
                             </div>
                             <div className="flex justify-between text-sm mb-2">
                               <span className="text-gray-600">Средняя цена входа с учётом процентов</span>
-                              <span className="font-medium text-orange-600">{stockData.avgEntryPriceWithInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}</span>
+                              <span className="font-medium text-orange-600">{formatCurrency(stockData.avgEntryPriceWithInterest, 2)}</span>
                             </div>
                             <div className="flex justify-between text-sm mb-2">
                               <span className="text-gray-600">Текущая цена</span>
                               <span className="font-medium">
-                                {stockData.currentPrice > 0 ? stockData.currentPrice.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 }) : '—'}
+                                {stockData.currentPrice > 0 ? formatCurrency(stockData.currentPrice, 2) : '—'}
                               </span>
                             </div>
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-600">Текущая стоимость</span>
-                              <span className="font-medium">{stockData.currentValue.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}</span>
+                              <span className="font-medium">{formatCurrency(stockData.currentValue)}</span>
                             </div>
                           </div>
                           {/* Trading activity */}
@@ -1496,7 +1547,7 @@ function Statistics() {
               {/* Stock-specific charts in minimalistic style */}
               <div className="space-y-6 mt-8">
                 {/* Monthly profit chart */}
-                <div className="bg-white p-6 rounded-lg border border-gray-200">
+                <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Прибыль по месяцам ({selectedStock})</h3>
                   <div style={{ height: '300px', width: '100%' }}>
                     <Bar
@@ -1514,11 +1565,7 @@ function Statistics() {
                             borderWidth: 1,
                             callbacks: {
                               label: function(context) {
-                                return `Прибыль: ${new Intl.NumberFormat('ru-RU', {
-                                  style: 'currency',
-                                  currency: 'RUB',
-                                  maximumFractionDigits: 0
-                                }).format(context.parsed.y)}`;
+                                return `Прибыль: ${formatCurrencyForChart(context.parsed.y)}`;
                               }
                             }
                           }
@@ -1530,11 +1577,7 @@ function Statistics() {
                             border: { display: false },
                             ticks: {
                               callback: function(value) {
-                                return new Intl.NumberFormat('ru-RU', {
-                                  style: 'currency',
-                                  currency: 'RUB',
-                                  notation: 'compact'
-                                }).format(value);
+                                return formatCurrencyForChart(value);
                               }
                             }
                           },
@@ -1550,7 +1593,7 @@ function Statistics() {
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Status chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Статус позиций</h3>
                     <div style={{ height: '250px', width: '100%' }}>
                       <Doughnut
@@ -1570,7 +1613,7 @@ function Statistics() {
                     </div>
                   </div>
                   {/* Price ranges chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Диапазоны цен входа</h3>
                     <div style={{ height: '250px', width: '100%' }}>
                       <Bar
@@ -1598,7 +1641,7 @@ function Statistics() {
                     </div>
                   </div>
                   {/* Cumulative profit chart */}
-                  <div className="bg-white p-6 rounded-lg border border-gray-200 lg:col-span-2">
+                  <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6 lg:col-span-2">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Накопленная прибыль ({selectedStock})</h3>
                     <div style={{ height: '250px', width: '100%' }}>
                       <Line
@@ -1631,7 +1674,7 @@ function Statistics() {
         {selectedStock === 'all' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Monthly Profit Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Прибыль по месяцам</h3>
               {Object.keys(stats.monthlyProfits).length > 0 ? (
                 <div style={{ height: '300px' }}>
@@ -1668,7 +1711,7 @@ function Statistics() {
               )}
             </div>
             {/* Daily Profit Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Среднедневная прибыль</h3>
               {Object.keys(stats.monthlyProfits).length > 0 ? (
                 <div style={{ height: '300px' }}>
@@ -1699,7 +1742,7 @@ function Statistics() {
               )}
             </div>
             {/* Trade Status Chart */}
-            <div className="bg-white p-6 rounded-lg border border-gray-200 lg:col-span-2">
+            <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden p-6 lg:col-span-2">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Статус позиций</h3>
               <div style={{ height: '300px' }} className="flex justify-center">
                 <Doughnut 
@@ -1731,7 +1774,7 @@ function Statistics() {
       {/* PDF Options Modal */}
       {showPDFOptions && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+          <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-xl p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Настройки PDF отчета</h3>
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-3">

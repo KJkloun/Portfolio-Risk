@@ -25,6 +25,7 @@ function TradeDetailsModal({ tradeId, onClose }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isClosing, setIsClosing] = useState(false);
 
   // form states
   const [qty, setQty] = useState('');
@@ -48,8 +49,15 @@ function TradeDetailsModal({ tradeId, onClose }) {
       setLoading(true);
       try{
         const resp=await axios.get(`/api/trades/${tradeId}`);
-        setTrade(resp.data);
-        const calc=calculateTradeDetails(resp.data, rateChanges);
+        const tradeData = resp.data;
+        setTrade(tradeData);
+        
+        // Add totalCost if missing for calculations
+        if (!tradeData.totalCost && tradeData.entryPrice && tradeData.quantity) {
+          tradeData.totalCost = Number(tradeData.entryPrice) * Number(tradeData.quantity);
+        }
+        
+        const calc=calculateTradeDetails(tradeData, rateChanges);
         setDetails(calc);
       }catch(e){setError('Ошибка загрузки');}
       finally{setLoading(false);}  
@@ -68,9 +76,16 @@ function TradeDetailsModal({ tradeId, onClose }) {
       setSuccessMsg('Частичное закрытие сохранено');
       window.dispatchEvent(new CustomEvent('tradesUpdated', {detail:{source:'modal'}}));
       setQty('');setExitPrice('');setExitDate('');setNotes('');
-      onClose();
+      handleClose();
     }catch(e){setError(e.response?.data?.message||'Ошибка сохранения');}
     finally{setSaving(false);}  
+  };
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      onClose();
+    }, 200); // Время анимации закрытия
   };
 
   const chartOptions={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:false,grid:{display:false},ticks:{color:'#9ca3af',font:{size:10}}},x:{grid:{display:false},ticks:{color:'#9ca3af',font:{size:10}}}}};
@@ -80,9 +95,12 @@ function TradeDetailsModal({ tradeId, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* backdrop */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in" onClick={onClose}></div>
+      <div 
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`} 
+        onClick={handleClose}
+      ></div>
       {/* modal */}
-      <div className="relative z-10 w-full max-w-2xl animate-scale-in">
+      <div className={`relative z-10 w-full max-w-2xl ${isClosing ? 'animate-scale-out' : 'animate-scale-in'}`}>
         <div className="bg-white rounded-2xl shadow-xl p-6 max-h-[90vh] overflow-y-auto">
           {loading && <div>Загрузка...</div>}
           {error && <div className="text-red-500 text-sm">{error}</div>}
@@ -90,48 +108,100 @@ function TradeDetailsModal({ tradeId, onClose }) {
             <>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold">{details.trade.symbol}</h2>
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+                <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">✕</button>
               </div>
 
               {/* KPI */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="text-center"><div className="text-2xl font-light text-gray-800">{details.daysHeld}</div><div className="text-xs text-gray-400">дней удержания</div></div>
-                <div className="text-center"><div className="text-2xl font-light text-blue-500">{details.currentRate}%</div><div className="text-xs text-gray-400">текущая ставка</div></div>
-                <div className="text-center"><div className="text-2xl font-light text-red-500">₽{Math.round(details.totalInterest).toLocaleString()}</div><div className="text-xs text-gray-400">накоплено процентов</div></div>
-                <div className="text-center"><div className="text-2xl font-light text-green-500">₽{Math.round(details.savingsFromRateChanges).toLocaleString()}</div><div className="text-xs text-gray-400">экономия от ЦБ</div></div>
-              </div>
-
-              {/* Charts */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="w-full max-w-[520px] mx-auto">
-                  <h6 className="text-sm font-medium text-gray-700 mb-2">Динамика ставки</h6>
-                  <div className="h-56"><Line data={prepareRateChartData(details)} options={chartOptions} /></div>
+                <div className="text-center">
+                  <div className="text-2xl font-light text-gray-800">{details.daysHeld}</div>
+                  <div className="text-xs text-gray-400">дней удержания</div>
                 </div>
-                <div className="w-full max-w-[520px] mx-auto">
-                  <h6 className="text-sm font-medium text-gray-700 mb-2">Проценты по периодам</h6>
-                  <div className="h-56"><Bar data={prepareInterestChartData(details)} options={chartOptions} /></div>
+                <div className="text-center">
+                  <div className="text-2xl font-light text-blue-500">{details.currentRate}%</div>
+                  <div className="text-xs text-gray-400">ставка</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-light text-red-500">₽{Math.round(details.totalInterest).toLocaleString()}</div>
+                  <div className="text-xs text-gray-400">накоплено процентов</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-light text-green-500">₽{Math.round(details.savingsFromRateChanges).toLocaleString()}</div>
+                  <div className="text-xs text-gray-400">экономия от ЦБ</div>
                 </div>
               </div>
 
-              {/* Periods table */}
-              <div className="mb-6">
-                <h6 className="text-lg font-medium text-gray-700 mb-3">Детализация периодов</h6>
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b"><th className="py-1 text-left">Период</th><th className="py-1 text-left">Дни</th><th className="py-1 text-left">Ставка</th><th className="py-1 text-left">Проценты</th></tr></thead>
-                  <tbody>
-                    {details.periods.map((p,idx)=>(
-                      <tr key={idx} className="border-t">
-                        <td className="py-1">{format(new Date(p.startDate),'dd.MM.yy',{locale:ru})} – {format(new Date(p.endDate),'dd.MM.yy',{locale:ru})}</td>
-                        <td className="py-1">{p.days}</td>
-                        <td className="py-1"><span className="inline-block px-1 py-0.5 rounded bg-gray-100 text-gray-600">{p.rate}%</span></td>
-                        <td className="py-1 text-red-600">₽{Math.round(p.interest).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {/* Charts - только для открытых или маржинальных сделок */}
+              {details.periods && details.periods.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="w-full max-w-[520px] mx-auto">
+                    <h6 className="text-sm font-medium text-gray-700 mb-2">Динамика ставки</h6>
+                    <div className="h-56"><Line data={prepareRateChartData(details)} options={chartOptions} /></div>
+                  </div>
+                  <div className="w-full max-w-[520px] mx-auto">
+                    <h6 className="text-sm font-medium text-gray-700 mb-2">Проценты по периодам</h6>
+                    <div className="h-56"><Bar data={prepareInterestChartData(details)} options={chartOptions} /></div>
+                  </div>
+                </div>
+              )}
 
-              {/* Partial close form */}
+              {/* Periods table - только если есть периоды */}
+              {details.periods && details.periods.length > 0 && (
+                <div className="mb-6">
+                  <h6 className="text-lg font-medium text-gray-700 mb-3">Детализация периодов</h6>
+                  <table className="w-full text-sm">
+                    <thead><tr className="border-b"><th className="py-1 text-left">Период</th><th className="py-1 text-left">Дни</th><th className="py-1 text-left">Ставка</th><th className="py-1 text-left">Проценты</th></tr></thead>
+                    <tbody>
+                      {details.periods.map((p,idx)=>(
+                        <tr key={idx} className="border-t">
+                          <td className="py-1">{format(new Date(p.startDate),'dd.MM.yy',{locale:ru})} – {format(new Date(p.endDate),'dd.MM.yy',{locale:ru})}</td>
+                          <td className="py-1">{p.days}</td>
+                          <td className="py-1"><span className="inline-block px-1 py-0.5 rounded bg-gray-100 text-gray-600">{p.rate}%</span></td>
+                          <td className="py-1 text-red-600">₽{Math.round(p.interest).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Информация для закрытых сделок без маржинальных данных */}
+              {details.periods && details.periods.length === 0 && trade.exitDate && (
+                <div className="mb-6 bg-gray-50 rounded-lg p-4">
+                  <h6 className="text-sm font-medium text-gray-700 mb-3">Информация о сделке</h6>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">Дата входа:</span>
+                      <div>{format(new Date(trade.entryDate), 'dd.MM.yyyy', { locale: ru })}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Дата выхода:</span>
+                      <div>{format(new Date(trade.exitDate), 'dd.MM.yyyy', { locale: ru })}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Цена входа:</span>
+                      <div>₽{Number(trade.entryPrice).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Цена выхода:</span>
+                      <div>₽{Number(trade.exitPrice).toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Количество:</span>
+                      <div>{trade.quantity} шт.</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Результат:</span>
+                      <div className={`font-medium ${(Number(trade.exitPrice) - Number(trade.entryPrice)) * Number(trade.quantity) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        ₽{((Number(trade.exitPrice) - Number(trade.entryPrice)) * Number(trade.quantity)).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Partial close form - только для открытых сделок */}
+              {!trade.exitDate && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <h6 className="text-sm font-medium text-gray-700 mb-3">Закрыть часть позиции</h6>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-3 text-sm">
@@ -155,7 +225,7 @@ function TradeDetailsModal({ tradeId, onClose }) {
                       try{
                         await axios.post(`/api/trades/${tradeId}/sell`, null,{params:{exitPrice:price}});
                         window.dispatchEvent(new CustomEvent('tradesUpdated',{detail:{source:'modal'}}));
-                        onClose();
+                        handleClose();
                       }catch(e){alert('Ошибка закрытия');}
                     }}
                     className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-500"
@@ -168,7 +238,7 @@ function TradeDetailsModal({ tradeId, onClose }) {
                       try{
                         await axios.delete(`/api/trades/${tradeId}`);
                         window.dispatchEvent(new CustomEvent('tradesUpdated',{detail:{source:'modal'}}));
-                        onClose();
+                        handleClose();
                       }catch(e){alert('Ошибка удаления');}
                     }}
                     className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-400"
@@ -178,6 +248,7 @@ function TradeDetailsModal({ tradeId, onClose }) {
                 </div>
                 {successMsg && <div className="text-green-600 text-xs mt-2">{successMsg}</div>}
               </div>
+              )}
             </>
           )}
         </div>

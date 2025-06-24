@@ -17,6 +17,23 @@ export function getRateForDate(trade, date, rateChanges = []) {
 // Calculate full analytics for a trade (days, periods, interests)
 export function calculateTradeDetails(trade, rateChanges = []) {
   if (!trade) return null;
+  
+  // For closed trades without margin analysis, return simplified details
+  if (trade.exitDate && (!trade.marginAmount || trade.marginAmount === 0)) {
+    const entryDate = new Date(trade.entryDate);
+    const exitDate = new Date(trade.exitDate);
+    const daysHeld = differenceInDays(exitDate, entryDate);
+    
+    return {
+      trade,
+      daysHeld,
+      currentRate: 0,
+      totalInterest: 0,
+      savingsFromRateChanges: 0,
+      periods: []
+    };
+  }
+  
   const entryDate = new Date(trade.entryDate);
   const today = trade.exitDate ? new Date(trade.exitDate) : new Date();
   const daysHeld = differenceInDays(today, entryDate);
@@ -59,7 +76,22 @@ export function calculateTradeDetails(trade, rateChanges = []) {
 
 // Chart helpers
 export function prepareRateChartData(details) {
-  if (!details) return null;
+  if (!details || !details.periods || details.periods.length === 0) {
+    return {
+      labels: ['Нет данных'],
+      datasets: [
+        {
+          label: 'Ставка %',
+          data: [0],
+          borderColor: '#e5e7eb',
+          tension: 0,
+          backgroundColor: 'rgba(229,231,235,0.1)',
+          pointRadius: 2,
+        },
+      ],
+    };
+  }
+  
   const labels = details.periods.map(p => format(new Date(p.endDate), 'dd.MM', { locale: ru }));
   const data = details.periods.map(p => p.rate);
   return {
@@ -78,9 +110,22 @@ export function prepareRateChartData(details) {
 }
 
 export function prepareInterestChartData(details) {
-  if (!details) return null;
+  if (!details || !details.periods || details.periods.length === 0) {
+    return {
+      labels: ['Нет данных'],
+      datasets: [
+        {
+          label: 'Проценты ₽',
+          backgroundColor: ['#e5e7eb'],
+          data: [0],
+        },
+      ],
+    };
+  }
+  
   const first = details.periods[0];
   const restSum = details.periods.slice(1).reduce((s, p) => s + p.interest, 0);
+  
   return {
     labels: [
       `${format(new Date(first.startDate), 'dd.MM', { locale: ru })} - ${format(new Date(first.endDate), 'dd.MM', { locale: ru })}`,

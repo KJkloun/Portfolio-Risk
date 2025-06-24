@@ -16,8 +16,11 @@ import {
 import Button from './common/Button';
 import { useNavigate } from 'react-router-dom';
 import TradeDetailsModal from './TradeDetailsModal';
+import { usePortfolio } from '../contexts/PortfolioContext';
+import { formatPortfolioCurrency } from '../utils/currencyFormatter';
 
 function TradeList() {
+  const { currentPortfolio } = usePortfolio();
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -48,11 +51,16 @@ function TradeList() {
 
   const [modalTradeId, setModalTradeId] = useState(null);
 
+  // Currency formatting function
+  const formatCurrency = (amount, decimals = 0) => {
+    return formatPortfolioCurrency(amount, currentPortfolio, decimals);
+  };
+
   useEffect(() => {
     loadTrades();
     loadSavedStockPrices();
     loadRateChanges();
-  }, []);
+  }, [currentPortfolio]);
 
   // Загрузка изменений ставок из localStorage
   const loadRateChanges = () => {
@@ -110,9 +118,18 @@ function TradeList() {
   }, []);
 
   const loadTrades = async () => {
+    if (!currentPortfolio?.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const response = await axios.get('/api/trades');
+      const response = await axios.get('/api/trades', {
+        headers: {
+          'X-Portfolio-ID': currentPortfolio.id
+        }
+      });
       console.log('API response:', response);
       if (Array.isArray(response.data)) {
         setTrades(response.data);
@@ -372,7 +389,7 @@ function TradeList() {
         const totalInterest = response.data.totalInterest || 0;
         const profit = response.data.profit || 0;
         
-        alert(`Сделка закрыта!\nОбщий процент: ${totalInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}\nПрибыль: ${profit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}`);
+        alert(`Сделка закрыта!\nОбщий процент: ${formatCurrency(totalInterest)}\nПрибыль: ${formatCurrency(profit)}`);
       } else {
         console.error('Invalid response format:', response.data);
         alert('Сделка закрыта, но возникла ошибка при обновлении данных');
@@ -392,7 +409,11 @@ function TradeList() {
       try {
         setError('');
         console.log('Deleting trade:', tradeId);
-        await axios.delete(`/api/trades/${tradeId}`);
+        await axios.delete(`/api/trades/${tradeId}`, {
+          headers: {
+            'X-Portfolio-ID': currentPortfolio?.id
+          }
+        });
         console.log('Trade deleted successfully');
         loadTrades();
       } catch (err) {
@@ -808,7 +829,7 @@ function TradeList() {
                       {group.totalQuantity} шт.
                     </span>
                     <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                      {group.totalSum.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(group.totalSum)}
                     </span>
                   </div>
                 </div>
@@ -970,7 +991,7 @@ function TradeList() {
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Вход:</span>
               <span className="font-medium">
-                {Number(trade.entryPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })}
+                {formatCurrency(Number(trade.entryPrice), 2)}
               </span>
             </div>
             
@@ -978,7 +999,7 @@ function TradeList() {
               <span className="text-gray-500">Выход:</span>
               <span className="font-medium">
                 {trade.exitPrice
-                  ? Number(trade.exitPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 2 })
+                  ? formatCurrency(Number(trade.exitPrice), 2)
                   : '—'}
               </span>
             </div>
@@ -992,7 +1013,7 @@ function TradeList() {
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Сумма:</span>
               <span className="font-medium">
-                {roundedTotalCost.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                {formatCurrency(roundedTotalCost)}
               </span>
             </div>
             
@@ -1007,7 +1028,7 @@ function TradeList() {
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Ежедн. %:</span>
               <span className="font-medium">
-                {roundedDailyInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                {formatCurrency(roundedDailyInterest)}
               </span>
             </div>
             
@@ -1019,8 +1040,8 @@ function TradeList() {
             
             <div className="flex items-center justify-between">
               <span className="text-gray-500">Накоплено %:</span>
-              <span className="font-medium text-red-600 text-right max-w-[90px] truncate" title={accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}>
-                {accumulatedInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+              <span className="font-medium text-red-600 text-right max-w-[90px] truncate" title={formatCurrency(accumulatedInterest)}>
+                {formatCurrency(accumulatedInterest)}
               </span>
             </div>
           </div>
@@ -1033,7 +1054,7 @@ function TradeList() {
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Прибыль без %</div>
                     <div className={`font-semibold ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {profit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(profit)}
                       <span className="text-xs ml-1 text-gray-500">
                         ({profitPercent.toFixed(1)}%)
                       </span>
@@ -1043,7 +1064,7 @@ function TradeList() {
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Итоговая прибыль</div>
                     <div className={`font-semibold ${profitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {profitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(profitAfterInterest)}
                       <span className="text-xs ml-1 text-gray-500">
                         ({profitAfterInterestPercent.toFixed(1)}%)
                       </span>
@@ -1062,7 +1083,7 @@ function TradeList() {
                   <div>
                     <div className="text-xs text-gray-500 mb-1">Потенциальная прибыль</div>
                     <div className={`font-semibold ${potentialProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {potentialProfit.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(potentialProfit)}
                       <span className="text-xs ml-1 text-gray-500">
                         ({potentialProfitPercent.toFixed(1)}%)
                       </span>
@@ -1072,7 +1093,7 @@ function TradeList() {
                   <div>
                     <div className="text-xs text-gray-500 mb-1">После вычета %</div>
                     <div className={`font-semibold ${potentialProfitAfterInterest >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {potentialProfitAfterInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB', maximumFractionDigits: 0 })}
+                      {formatCurrency(potentialProfitAfterInterest)}
                       <span className="text-xs ml-1 text-gray-500">
                         ({potentialProfitAfterInterestPercent.toFixed(1)}%)
                       </span>
@@ -1080,7 +1101,7 @@ function TradeList() {
                   </div>
                 </div>
                 <div className="text-xs text-right text-gray-500 mt-1">
-                  При курсе {parseFloat(currentPrice).toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
+                  При курсе {formatCurrency(parseFloat(currentPrice), 2)}
                 </div>
               </div>
             </div>

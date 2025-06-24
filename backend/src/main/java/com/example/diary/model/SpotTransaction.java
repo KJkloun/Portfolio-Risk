@@ -84,8 +84,8 @@ public class SpotTransaction {
         if (price != null && quantity != null) {
             BigDecimal calculatedAmount = price.multiply(quantity);
             
-            // Для покупок делаем сумму отрицательной (как в таблице)
-            if (transactionType == TransactionType.BUY) {
+            // Для покупок и выводов делаем сумму отрицательной (уменьшают кэш)
+            if (transactionType == TransactionType.BUY || transactionType == TransactionType.WITHDRAW) {
                 calculatedAmount = calculatedAmount.negate();
             }
             

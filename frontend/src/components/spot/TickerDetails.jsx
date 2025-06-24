@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import { usePortfolio } from '../../contexts/PortfolioContext';
+import { formatPortfolioCurrency } from '../../utils/currencyFormatter';
 
 function TickerDetails() {
   const { ticker } = useParams();
+  const { currentPortfolio } = usePortfolio();
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState({});
   const [loading, setLoading] = useState(true);
@@ -13,9 +16,18 @@ function TickerDetails() {
   }, [ticker]);
 
   const fetchTickerDetails = async () => {
+    if (!currentPortfolio?.id) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
-      const response = await axios.get('/api/spot-transactions');
+      const response = await axios.get('/api/spot-transactions', {
+        headers: {
+          'X-Portfolio-ID': currentPortfolio.id
+        }
+      });
       const allTransactions = response.data;
       
       // Filter transactions for this ticker
@@ -95,10 +107,7 @@ function TickerDetails() {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
+    return formatPortfolioCurrency(amount, currentPortfolio, 2);
   };
 
   const getTypeConfig = (type) => {

@@ -16,6 +16,7 @@ export const PortfolioProvider = ({ children }) => {
   const [portfolios, setPortfolios] = useState([]);
   const [currentPortfolio, setCurrentPortfolio] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
@@ -128,16 +129,23 @@ export const PortfolioProvider = ({ children }) => {
     return portfolios.filter(p => p.type === type);
   };
 
+  const refreshData = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   const value = {
     portfolios,
     currentPortfolio,
+    selectedPortfolio: currentPortfolio,
     loading,
+    refreshTrigger,
     loadPortfolios,
     createPortfolio,
     updatePortfolio,
     deletePortfolio,
     selectPortfolio,
-    getPortfoliosByType
+    getPortfoliosByType,
+    refreshData
   };
 
   return (
@@ -146,6 +154,7 @@ export const PortfolioProvider = ({ children }) => {
     </PortfolioContext.Provider>
   );
 }; 
+ 
  
  
  

@@ -1,18 +1,30 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { usePortfolio } from '../../contexts/PortfolioContext';
+import { formatPortfolioCurrency } from '../../utils/currencyFormatter';
 
 function CashMovements() {
+  const { currentPortfolio, refreshTrigger } = usePortfolio();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchTransactions();
-  }, []);
+  }, [currentPortfolio, refreshTrigger]);
 
   const fetchTransactions = async () => {
+    if (!currentPortfolio?.id) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      const response = await axios.get('/api/spot-transactions');
+      const response = await axios.get('/api/spot-transactions', {
+        headers: {
+          'X-Portfolio-ID': currentPortfolio.id
+        }
+      });
       const data = response.data;
       
       // Filter only cash movement transactions and sort by date (newest first)
@@ -44,11 +56,7 @@ function CashMovements() {
   const netCashFlow = totalDeposits + totalDividends - totalWithdrawals;
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
+    return formatPortfolioCurrency(amount, currentPortfolio, 2);
   };
 
   const getMovementType = (transactionType) => {
