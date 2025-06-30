@@ -65,40 +65,95 @@ function StockAccounting() {
             totalBought: 0,
             totalSold: 0,
             remaining: 0,
-            totalProfit: 0
+            realizedProfit: 0,  // Фактическая прибыль от проданных акций
+            averageCostBasis: 0, // Средняя себестоимость оставшихся акций
+            fifoQueue: []  // Очередь покупок для FIFO
           };
         }
         
-        if (tx.transactionType === 'BUY') {
-          positions[tx.ticker].totalBought += tx.quantity;
-          positions[tx.ticker].totalProfit -= tx.price * tx.quantity; // Cost basis
-        } else if (tx.transactionType === 'SELL') {
-          positions[tx.ticker].totalSold += tx.quantity;
-          positions[tx.ticker].totalProfit += tx.price * tx.quantity; // Sale proceeds
-        }
+        const position = positions[tx.ticker];
         
-        positions[tx.ticker].remaining = positions[tx.ticker].totalBought - positions[tx.ticker].totalSold;
+        if (tx.transactionType === 'BUY') {
+          position.totalBought += tx.quantity;
+          position.remaining += tx.quantity;
+          // Добавляем покупку в FIFO очередь
+          position.fifoQueue.push({
+            price: tx.price,
+            quantity: tx.quantity,
+            remainingQuantity: tx.quantity
+          });
+        } else if (tx.transactionType === 'SELL') {
+          position.totalSold += tx.quantity;
+          let remainingToSell = tx.quantity;
+          
+          // Обрабатываем продажу по FIFO
+          while (remainingToSell > 0 && position.fifoQueue.length > 0) {
+            const firstPurchase = position.fifoQueue[0];
+            
+            if (firstPurchase.remainingQuantity <= remainingToSell) {
+              // Продаем всю оставшуюся часть этой покупки
+              const soldQuantity = firstPurchase.remainingQuantity;
+              const costBasis = firstPurchase.price * soldQuantity;
+              const saleProceeds = tx.price * soldQuantity;
+              
+              position.realizedProfit += (saleProceeds - costBasis);
+              position.remaining -= soldQuantity;
+              remainingToSell -= soldQuantity;
+              
+              // Удаляем полностью использованную покупку
+              position.fifoQueue.shift();
+            } else {
+              // Продаем часть этой покупки
+              const costBasis = firstPurchase.price * remainingToSell;
+              const saleProceeds = tx.price * remainingToSell;
+              
+              position.realizedProfit += (saleProceeds - costBasis);
+              position.remaining -= remainingToSell;
+              firstPurchase.remainingQuantity -= remainingToSell;
+              remainingToSell = 0;
+            }
+          }
+        }
       }
     });
 
-    // Show ALL stocks (including those with 0 remaining shares)
+    // Рассчитываем среднюю себестоимость для оставшихся акций
+    Object.values(positions).forEach(pos => {
+      if (pos.remaining > 0 && pos.fifoQueue.length > 0) {
+        let totalCost = 0;
+        let totalQuantity = 0;
+        
+        pos.fifoQueue.forEach(purchase => {
+          totalCost += purchase.price * purchase.remainingQuantity;
+          totalQuantity += purchase.remainingQuantity;
+        });
+        
+        pos.averageCostBasis = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+      }
+    });
+
+    // Показываем ВСЕ акции (включая закрытые позиции)
     return Object.values(positions).map(pos => {
       const currentPrice = savedPrices[pos.ticker] || 0;
-      let finalProfit = pos.totalProfit;
+      let unrealizedProfit = 0;
       
-      // If we still have remaining shares, add current market value
+      // Нереализованная прибыль только для оставшихся акций
       if (pos.remaining > 0 && currentPrice > 0) {
-        finalProfit += currentPrice * pos.remaining;
+        unrealizedProfit = (currentPrice - pos.averageCostBasis) * pos.remaining;
       }
+      
+      // Общая прибыль = реализованная + нереализованная
+      const totalProfit = pos.realizedProfit + unrealizedProfit;
       
       return {
         ...pos,
         currentPrice,
-        finalProfit,
+        unrealizedProfit,
+        totalProfit,
         status: pos.remaining > 0 ? 'Активная' : 'Закрытая'
       };
     }).sort((a, b) => {
-      // Sort by status (active first), then by ticker
+      // Сортировка по статусу (активные первыми), затем по тикеру
       if (a.status !== b.status) {
         return a.status === 'Активная' ? -1 : 1;
       }
@@ -111,7 +166,9 @@ function StockAccounting() {
   const activePositions = positions.filter(pos => pos.remaining > 0);
   const closedPositions = positions.filter(pos => pos.remaining === 0);
   const totalStocks = positions.length;
-  const totalProfit = positions.reduce((sum, pos) => sum + pos.finalProfit, 0);
+  const totalProfit = positions.reduce((sum, pos) => sum + pos.totalProfit, 0);
+  const totalRealizedProfit = positions.reduce((sum, pos) => sum + pos.realizedProfit, 0);
+  const totalUnrealizedProfit = positions.reduce((sum, pos) => sum + pos.unrealizedProfit, 0);
 
   const formatCurrency = (amount) => {
     return formatPortfolioCurrency(amount, currentPortfolio, 2);
@@ -169,11 +226,12 @@ function StockAccounting() {
         {/* Header */}
         <div className="mb-6">
           <h3 className="text-2xl font-light text-gray-800 mb-2">Учёт акций</h3>
-          <p className="text-gray-500">Полная статистика по всем акциям в портфеле ({currentPortfolio?.currency || 'USD'})</p>
+          <p className="text-gray-500">Полная статистика по всем акциям с FIFO расчетом прибыли ({currentPortfolio?.currency || 'USD'})</p>
+          <p className="text-xs text-gray-400 mt-1">Реализованная П/У - прибыль от проданных акций. Нереализованная П/У - потенциальная прибыль от оставшихся акций</p>
         </div>
 
         {/* Summary Stats */}
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
             <div className="px-6 py-4 text-center">
               <div className="text-2xl font-light text-gray-800">
@@ -203,6 +261,24 @@ function StockAccounting() {
           
           <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
             <div className="px-6 py-4 text-center">
+              <div className={`text-2xl font-light ${totalRealizedProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {formatCurrency(totalRealizedProfit)}
+              </div>
+              <div className="text-xs text-gray-400">реализованная П/У</div>
+            </div>
+          </div>
+          
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+            <div className="px-6 py-4 text-center">
+              <div className={`text-2xl font-light ${totalUnrealizedProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {formatCurrency(totalUnrealizedProfit)}
+              </div>
+              <div className="text-xs text-gray-400">нереализованная П/У</div>
+            </div>
+          </div>
+          
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+            <div className="px-6 py-4 text-center">
               <div className={`text-2xl font-light ${totalProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                 {formatCurrency(totalProfit)}
               </div>
@@ -215,7 +291,7 @@ function StockAccounting() {
         <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
           <div className="px-6 py-4">
             <h6 className="text-lg font-medium text-gray-700 mb-1">Все акции</h6>
-            <p className="text-sm text-gray-400">Полная статистика по всем акциям (активные и закрытые позиции)</p>
+            <p className="text-sm text-gray-400">Полная статистика с FIFO расчетом: средняя цена покупки оставшихся акций, реализованная прибыль от продаж, нереализованная прибыль от текущих позиций</p>
           </div>
           
           {positions.length > 0 ? (
@@ -229,8 +305,11 @@ function StockAccounting() {
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Куплено</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Продано</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Остаток</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Средняя цена</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Текущая цена</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Прибыль</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Реализ. П/У</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Нереализ. П/У</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Общая П/У</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -261,12 +340,28 @@ function StockAccounting() {
                         {position.remaining.toLocaleString()}
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-800 text-right">
+                        {position.remaining > 0 && position.averageCostBasis > 0 ? formatCurrency(position.averageCostBasis) : '-'}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-800 text-right">
                         {position.currentPrice > 0 ? formatCurrency(position.currentPrice) : '-'}
                       </td>
                       <td className={`px-4 py-4 text-sm text-right font-medium ${
-                        position.finalProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                        position.realizedProfit >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {position.finalProfit >= 0 ? '+' : ''}{formatCurrency(position.finalProfit)}
+                        {position.realizedProfit >= 0 ? '+' : ''}{formatCurrency(position.realizedProfit)}
+                      </td>
+                      <td className={`px-4 py-4 text-sm text-right font-medium ${
+                        position.unrealizedProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {position.remaining > 0 ? 
+                          (position.unrealizedProfit >= 0 ? '+' : '') + formatCurrency(position.unrealizedProfit) : 
+                          '-'
+                        }
+                      </td>
+                      <td className={`px-4 py-4 text-sm text-right font-medium ${
+                        position.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {position.totalProfit >= 0 ? '+' : ''}{formatCurrency(position.totalProfit)}
                       </td>
                     </tr>
                   ))}
