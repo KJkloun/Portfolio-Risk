@@ -1,0 +1,1 @@
+UPDATE trades SET portfolio_id=1 WHERE portfolio_id IS NULL; 

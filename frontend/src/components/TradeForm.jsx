@@ -4,6 +4,8 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { usePortfolio } from '../contexts/PortfolioContext';
+import { formatPortfolioCurrency } from '../utils/currencyFormatter';
 import { 
   calculateTotalCost, 
   calculateYearlyInterest, 
@@ -21,6 +23,7 @@ const schema = yup.object().shape({
 
 function TradeForm() {
   const navigate = useNavigate();
+  const { currentPortfolio } = usePortfolio();
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calculation, setCalculation] = useState(null);
@@ -41,6 +44,23 @@ function TradeForm() {
       notes: ''
     }
   });
+
+  if (!currentPortfolio) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-400 mb-4">📊</div>
+          <p className="text-gray-700 mb-4">Портфель не выбран</p>
+          <button
+            onClick={() => window.location.href = '/'}
+            className="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Выбрать портфель
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const entryPrice = watch('entryPrice');
   const quantity = watch('quantity');
@@ -92,9 +112,13 @@ function TradeForm() {
       // Удаляем поле creditRate, чтобы не было конфликта
       delete formattedData.creditRate;
       
-      const response = await axios.post('/api/trades/buy', formattedData);
+      const response = await axios.post('/api/trades/buy', formattedData, {
+        headers: {
+          'X-Portfolio-ID': currentPortfolio.id
+        }
+      });
       console.log('Trade saved successfully:', response.data);
-      navigate('/');
+      navigate('/margin');
     } catch (err) {
       console.error('Error saving trade:', err);
       setError(err.response?.data?.message || 'Произошла ошибка при сохранении сделки.');
@@ -103,15 +127,34 @@ function TradeForm() {
     }
   };
 
+  const formatCurrency = (amount) => {
+    return formatPortfolioCurrency(amount, currentPortfolio, 2);
+  };
+
+  const getCurrencySymbol = () => {
+    switch (currentPortfolio?.currency) {
+      case 'USD': return '$';
+      case 'EUR': return '€';
+      case 'CNY': return '¥';
+      case 'KZT': return '₸';
+      case 'RUB':
+      default: return '₽';
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="p-6 max-w-4xl mx-auto">
-        <h1 className="text-2xl font-medium text-gray-900 mb-8">Новая сделка</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+      <div className="container-fluid p-4 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <h3 className="text-2xl font-light text-gray-800 mb-2">Новая маржинальная сделка</h3>
+          <p className="text-gray-500">Добавление новой позиции в портфель ({currentPortfolio?.currency || 'RUB'})</p>
+        </div>
         
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="p-6">
+        <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-sm border-0 overflow-hidden">
+          <div className="px-8 py-6">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
+              <div className="bg-red-50/80 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm">
                 {error}
               </div>
             )}
@@ -126,7 +169,7 @@ function TradeForm() {
                     id="symbol"
                     type="text"
                     placeholder="SBER"
-                    className={`w-full px-3 py-2 border rounded-md text-sm focus:ring-1 focus:ring-gray-400 focus:border-gray-400 ${errors.symbol ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300'}`}
+                    className={`w-full px-4 py-3 border rounded-xl text-sm bg-white/50 focus:ring-2 focus:ring-gray-200 focus:border-gray-300 transition-all ${errors.symbol ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-gray-200'}`}
                     {...register('symbol')}
                   />
                   {errors.symbol && (
@@ -142,7 +185,7 @@ function TradeForm() {
                     id="quantity"
                     type="number"
                     placeholder="10"
-                    className={`w-full px-3 py-2 border rounded-md text-sm focus:ring-1 focus:ring-gray-400 focus:border-gray-400 ${errors.quantity ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300'}`}
+                    className={`w-full px-4 py-3 border rounded-xl text-sm bg-white/50 focus:ring-2 focus:ring-gray-200 focus:border-gray-300 transition-all ${errors.quantity ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-gray-200'}`}
                     {...register('quantity')}
                     onChange={(e) => {
                       register('quantity').onChange(e);
@@ -159,15 +202,15 @@ function TradeForm() {
                     Цена акции
                   </label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 text-sm">₽</span>
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <span className="text-gray-500 text-sm">{getCurrencySymbol()}</span>
                     </div>
                     <input
                       id="entryPrice"
                       type="number"
                       step="0.01"
                       placeholder="250.00"
-                      className={`w-full pl-7 pr-3 py-2 border rounded-md text-sm focus:ring-1 focus:ring-gray-400 focus:border-gray-400 ${errors.entryPrice ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300'}`}
+                      className={`w-full pl-8 pr-4 py-3 border rounded-xl text-sm bg-white/50 focus:ring-2 focus:ring-gray-200 focus:border-gray-300 transition-all ${errors.entryPrice ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-gray-200'}`}
                       {...register('entryPrice')}
                       onChange={(e) => {
                         register('entryPrice').onChange(e);
@@ -190,14 +233,14 @@ function TradeForm() {
                       type="number"
                       step="0.01"
                       placeholder="23"
-                      className={`w-full pr-7 pl-3 py-2 border rounded-md text-sm focus:ring-1 focus:ring-gray-400 focus:border-gray-400 ${errors.creditRate ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300'}`}
+                      className={`w-full pr-8 pl-4 py-3 border rounded-xl text-sm bg-white/50 focus:ring-2 focus:ring-gray-200 focus:border-gray-300 transition-all ${errors.creditRate ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-gray-200'}`}
                       {...register('creditRate')}
                       onChange={(e) => {
                         register('creditRate').onChange(e);
                         setTimeout(calculateCredit, 100);
                       }}
                     />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
                       <span className="text-gray-500 text-sm">%</span>
                     </div>
                   </div>
@@ -213,7 +256,7 @@ function TradeForm() {
                   <input
                     id="entryDate"
                     type="date"
-                    className={`w-full px-3 py-2 border rounded-md text-sm focus:ring-1 focus:ring-gray-400 focus:border-gray-400 ${errors.entryDate ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300'}`}
+                    className={`w-full px-4 py-3 border rounded-xl text-sm bg-white/50 focus:ring-2 focus:ring-gray-200 focus:border-gray-300 transition-all ${errors.entryDate ? 'border-red-300 focus:border-red-400 focus:ring-red-200' : 'border-gray-200'}`}
                     {...register('entryDate')}
                   />
                   {errors.entryDate && (
@@ -229,50 +272,50 @@ function TradeForm() {
                     id="notes"
                     placeholder="Долгосрочная инвестиция в IT сектор"
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm bg-white/50 focus:ring-2 focus:ring-gray-200 focus:border-gray-300 transition-all"
                     {...register('notes')}
                   ></textarea>
                 </div>
               </div>
 
               {calculation && (
-                <div className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-medium mb-4 text-gray-900">Расчет сделки</h3>
+                <div className="border-t border-gray-100 pt-6">
+                  <h4 className="text-lg font-medium mb-4 text-gray-800">Расчет сделки</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-sm text-gray-600">Общая сумма</p>
-                      <p className="text-lg font-medium mt-1 text-gray-900">
-                        {calculation.totalCost.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
+                    <div className="bg-gray-50/50 rounded-xl p-4">
+                      <p className="text-sm text-gray-500">Общая сумма</p>
+                      <p className="text-lg font-medium mt-1 text-gray-800">
+                        {formatCurrency(calculation.totalCost)}
                       </p>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-sm text-gray-600">Процент в год</p>
-                      <p className="text-lg font-medium mt-1 text-gray-900">
-                        {calculation.yearlyInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
+                    <div className="bg-gray-50/50 rounded-xl p-4">
+                      <p className="text-sm text-gray-500">Процент в год</p>
+                      <p className="text-lg font-medium mt-1 text-gray-800">
+                        {formatCurrency(calculation.yearlyInterest)}
                       </p>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-4">
-                      <p className="text-sm text-gray-600">Процент в день</p>
-                      <p className="text-lg font-medium mt-1 text-gray-900">
-                        {calculation.dailyInterest.toLocaleString('ru-RU', { style: 'currency', currency: 'RUB' })}
+                    <div className="bg-gray-50/50 rounded-xl p-4">
+                      <p className="text-sm text-gray-500">Процент в день</p>
+                      <p className="text-lg font-medium mt-1 text-gray-800">
+                        {formatCurrency(calculation.dailyInterest)}
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+              <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-100">
                 <button
                   type="button"
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-gray-400 w-full sm:w-auto"
-                  onClick={() => navigate('/')}
+                  className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 bg-white/80 hover:bg-white focus:outline-none focus:ring-2 focus:ring-gray-200 w-full sm:w-auto transition-all"
+                  onClick={() => navigate('/margin')}
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-4 py-2 border border-transparent rounded-md text-white bg-gray-700 hover:bg-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-400 w-full sm:w-auto disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="px-6 py-3 border border-transparent rounded-xl text-white bg-gray-800 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300 w-full sm:w-auto disabled:bg-gray-400 disabled:cursor-not-allowed transition-all"
                 >
                   {isSubmitting ? (
                     <div className="flex items-center justify-center">
